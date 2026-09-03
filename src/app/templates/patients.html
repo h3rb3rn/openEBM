@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% set active_page = "patienten" %}
+{% block title %}Patienten – EBM Analyzer{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-5xl mx-auto">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900" data-i18n="patients.title">Patienten</h1>
+      <p class="text-sm text-gray-500 mt-0.5" data-i18n="patients.subtitle">Patientenverwaltung (Mandantenisoliert)</p>
+    </div>
+    <button onclick="document.getElementById('modal-create').classList.remove('hidden')"
+      class="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+      data-i18n="patients.new_patient">
+      + Neuer Patient
+    </button>
+  </div>
+
+  <!-- Search -->
+  <div class="mb-4">
+    <input type="text" id="search-input" placeholder="Nach Name oder Patientennummer suchen..."
+      data-i18n-placeholder="patients.search_placeholder"
+      class="w-full max-w-sm px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none"
+      oninput="filterPatients(this.value)">
+  </div>
+
+  <!-- Table -->
+  <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div id="patients-table">
+      <div class="flex items-center justify-center py-12"><div class="spinner"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: create patient -->
+<div id="modal-create" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="patients.modal_title">Neuer Patient</h2>
+      <button onclick="document.getElementById('modal-create').classList.add('hidden')" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+    <form id="create-form" class="p-6 space-y-4">
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="patients.first_name">Vorname</label>
+          <input type="text" name="first_name" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="patients.last_name">Nachname</label>
+          <input type="text" name="last_name" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="patients.patient_number">Patientennummer</label>
+          <input type="text" name="patient_number" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="common.date_of_birth">Geburtsdatum</label>
+          <input type="date" name="date_of_birth" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-4">
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="common.gender">Geschlecht</label>
+          <select name="gender" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+            <option value="m" data-i18n="common.male">Männlich</option>
+            <option value="w" data-i18n="common.female">Weiblich</option>
+            <option value="d" data-i18n="common.diverse">Divers</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="common.insurance_type">Kassenart</label>
+          <select name="insurance_type" required class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+            <option value="GKV">GKV</option>
+            <option value="PKV">PKV</option>
+            <option value="SELBSTZAHLER" data-i18n="common.self_payer">Selbstzahler</option>
+            <option value="BG">BG</option>
+          </select>
+        </div>
+        <div>
+          <label class="text-sm font-medium text-gray-700 block mb-1.5" data-i18n="patients.insurance_id">Kassennummer</label>
+          <input type="text" name="insurance_id" class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+      </div>
+      <div class="flex gap-3 pt-2">
+        <button type="submit" class="flex-1 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 transition-colors text-sm" data-i18n="common.save">Speichern</button>
+        <button type="button" onclick="document.getElementById('modal-create').classList.add('hidden')"
+          class="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 text-sm" data-i18n="common.cancel">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allPatients = [];
+
+async function loadPatients() {
+  const resp = await apiCall('GET', '/patients/');
+  if (!resp || !resp.ok) return;
+  allPatients = await resp.json();
+  renderPatients(allPatients);
+}
+
+function filterPatients(query) {
+  if (!query) { renderPatients(allPatients); return; }
+  const q = query.toLowerCase();
+  renderPatients(allPatients.filter(p =>
+    p.last_name.toLowerCase().includes(q) ||
+    p.first_name.toLowerCase().includes(q) ||
+    p.patient_number.toLowerCase().includes(q)
+  ));
+}
+
+function renderPatients(patients) {
+  const container = document.getElementById('patients-table');
+  if (patients.length === 0) {
+    container.innerHTML = `<div class="text-center py-12 text-gray-400 text-sm">${t('patients.none_found')}</div>`;
+    return;
+  }
+  const insuranceBadge = type => ({
+    GKV: 'bg-blue-50 text-blue-700 border-blue-200',
+    PKV: 'bg-purple-50 text-purple-700 border-purple-200',
+    SELBSTZAHLER: 'bg-gray-50 text-gray-700 border-gray-200',
+    BG: 'bg-orange-50 text-orange-700 border-orange-200',
+  })[type] || 'bg-gray-50 text-gray-600 border-gray-200';
+
+  container.innerHTML = `
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+        <th class="px-5 py-3 font-medium">${t('common.name')}</th>
+        <th class="px-4 py-3 font-medium">${t('patients.th_number')}</th>
+        <th class="px-4 py-3 font-medium">${t('common.date_of_birth')}</th>
+        <th class="px-4 py-3 font-medium">${t('common.insurance_type')}</th>
+        <th class="px-4 py-3 font-medium"></th>
+      </tr></thead>
+      <tbody>
+        ${patients.map(p => `
+          <tr class="border-b border-gray-50 hover:bg-gray-50">
+            <td class="px-5 py-3 font-medium">${p.last_name}, ${p.first_name}</td>
+            <td class="px-4 py-3 text-gray-600 font-mono text-xs">${p.patient_number}</td>
+            <td class="px-4 py-3 text-gray-600">${p.date_of_birth}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-medium border ${insuranceBadge(p.insurance_type)}">${p.insurance_type}</span>
+            </td>
+            <td class="px-4 py-3">
+              <a href="/analyse?mode=persistent&patient_id=${p.id}" class="text-sky-600 hover:text-sky-700 text-xs font-medium">${t('patients.start_analysis')}</a>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+document.getElementById('create-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  const resp = await apiCall('POST', '/patients/', data);
+  if (resp && resp.ok) {
+    document.getElementById('modal-create').classList.add('hidden');
+    form.reset();
+    await loadPatients();
+  } else {
+    const err = await resp.json();
+    alert(t('common.error_prefix') + (err.detail || t('patients.save_failed')));
+  }
+});
+
+document.addEventListener('DOMContentLoaded', loadPatients);
+</script>
+{% endblock %}

@@ -1,0 +1,33 @@
+name: Tests
+
+# Runs the pytest suite (pure-logic unit tests — auth token extraction,
+# KBV PDF parsing heuristics, import status state machine) on every push
+# and PR. Deliberately does not spin up Postgres/Neo4j/ChromaDB/Valkey:
+# these tests target pure functions and use fakeredis for the one module
+# that touches Valkey, so the gate stays fast and has no live-service
+# flakiness.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: tests/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install -r tests/requirements.txt
+
+      - name: Run pytest
+        run: pytest -v

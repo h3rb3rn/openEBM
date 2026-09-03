@@ -1,0 +1,71 @@
+site_name: openEBM – Technical Documentation
+site_description: Sovereign, GDPR-compliant EBM coding assistant — internal technical reference
+site_author: openEBM Contributors
+site_url: https://h3rb3rn.github.io/openEBM/
+docs_dir: docs
+repo_url: https://github.com/h3rb3rn/openEBM
+repo_name: h3rb3rn/openEBM
+edit_uri: edit/main/docs/
+
+theme:
+  name: material
+  language: de
+  palette:
+    - scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.tabbed:
+      alternate_style: true
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Screenshots: screenshots.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Data Flow: architecture/data-flow.md
+      - Database Schema: architecture/database.md
+      - Security Model: architecture/security.md
+  - API Reference:
+      - Authentication: api/authentication.md
+      - Analysis: api/analysis.md
+      - Patients: api/patients.md
+      - Case Files: api/cases.md
+      - Admin: api/admin.md
+      - Interoperability: api/interop.md
+  - Interoperability:
+      - GDT 2.1 Bridge: interop/gdt.md
+      - HL7 FHIR R4: interop/fhir.md
+      - MCP External Tool: interop/mcp-tool.md
+  - Deployment:
+      - Docker Compose: deployment/docker-compose.md
+      - Environment Variables: deployment/environment.md
+      - Production Checklist: deployment/production.md
+  - Development:
+      - Setup: development/setup.md
+      - Coding Conventions: development/conventions.md
+      - Changelog: development/changelog.md

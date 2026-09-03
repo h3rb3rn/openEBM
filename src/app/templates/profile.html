@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% set active_page = "profil" %}
+{% block title %}Profil – EBM Analyzer{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-2xl mx-auto">
+
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900" data-i18n="profile.title">Profil</h1>
+    <p class="text-sm text-gray-500 mt-0.5" data-i18n="profile.subtitle">Konto, Passwort und Zwei-Faktor-Authentifizierung verwalten</p>
+  </div>
+
+  <!-- Account info -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+    <h2 class="text-sm font-semibold text-gray-900 mb-4" data-i18n="profile.account_heading">Konto</h2>
+    <div class="grid grid-cols-2 gap-4 text-sm">
+      <div>
+        <div class="text-xs text-gray-500" data-i18n="profile.full_name">Name</div>
+        <div class="font-medium text-gray-900 mt-0.5" id="profile-full-name">–</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500" data-i18n="login.email">E-Mail</div>
+        <div class="font-medium text-gray-900 mt-0.5" id="profile-email">–</div>
+      </div>
+      <div>
+        <div class="text-xs text-gray-500" data-i18n="profile.role">Rolle</div>
+        <div class="font-medium text-gray-900 mt-0.5" id="profile-role">–</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Change password -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6 mb-6">
+    <h2 class="text-sm font-semibold text-gray-900 mb-1" data-i18n="profile.password_heading">Passwort ändern</h2>
+    <p class="text-xs text-gray-500 mb-4" data-i18n="profile.password_hint">Mindestens 8 Zeichen.</p>
+
+    <div id="password-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <form id="password-form" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.current_password">Aktuelles Passwort</label>
+        <input type="password" id="current-password" required autocomplete="current-password"
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.new_password">Neues Passwort</label>
+        <input type="password" id="new-password" required minlength="8" autocomplete="new-password"
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.new_password_confirm">Neues Passwort bestätigen</label>
+        <input type="password" id="new-password-confirm" required minlength="8" autocomplete="new-password"
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <button type="submit" id="password-btn"
+        class="px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+        data-i18n="profile.password_submit">
+        Passwort ändern
+      </button>
+    </form>
+  </div>
+
+  <!-- 2FA -->
+  <div class="bg-white border border-gray-200 rounded-xl p-6">
+    <div class="flex items-center justify-between mb-1">
+      <h2 class="text-sm font-semibold text-gray-900" data-i18n="profile.twofa_heading">Zwei-Faktor-Authentifizierung (2FA)</h2>
+      <span id="twofa-badge" class="hidden text-xs font-medium px-2 py-0.5 rounded-full"></span>
+    </div>
+    <p class="text-xs text-gray-500 mb-4" data-i18n="profile.twofa_hint">Schützt Ihr Konto zusätzlich mit einem zeitbasierten Code aus einer Authenticator-App.</p>
+
+    <div id="twofa-msg" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+    <!-- State: disabled -->
+    <div id="twofa-disabled-view">
+      <button id="twofa-start-btn" type="button"
+        class="px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+        data-i18n="profile.twofa_enable_button">
+        2FA aktivieren
+      </button>
+    </div>
+
+    <!-- State: setup in progress -->
+    <div id="twofa-setup-view" class="hidden space-y-4">
+      <div class="flex flex-col sm:flex-row gap-5 items-start">
+        <img id="twofa-qr" alt="QR-Code" class="w-40 h-40 border border-gray-200 rounded-lg flex-shrink-0">
+        <div class="text-sm text-gray-600 min-w-0">
+          <p class="mb-2" data-i18n="profile.twofa_scan_hint">QR-Code mit einer Authenticator-App scannen (z.B. Aegis, FreeOTP, Google Authenticator) oder den Schlüssel manuell eingeben:</p>
+          <code id="twofa-secret" class="block bg-gray-50 border border-gray-200 rounded-md px-2 py-1.5 text-xs break-all font-mono"></code>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.twofa_confirm_code">Code aus der App zur Bestätigung eingeben</label>
+        <input type="text" id="twofa-confirm-code" autocomplete="one-time-code" inputmode="numeric"
+          class="w-full max-w-[200px] px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm tracking-widest text-center">
+      </div>
+      <div class="flex gap-3">
+        <button id="twofa-confirm-btn" type="button"
+          class="px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+          data-i18n="profile.twofa_confirm_button">
+          Bestätigen &amp; aktivieren
+        </button>
+        <button id="twofa-cancel-setup-btn" type="button"
+          class="px-5 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+          data-i18n="common.cancel">
+          Abbrechen
+        </button>
+      </div>
+    </div>
+
+    <!-- State: backup codes (shown once) -->
+    <div id="twofa-backup-view" class="hidden space-y-4">
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800" data-i18n="profile.twofa_backup_warning">
+        Diese Backup-Codes werden nur einmal angezeigt. Jeder Code kann einmalig anstelle des Authenticator-Codes verwendet werden, falls Sie keinen Zugriff auf Ihre App haben. Sicher aufbewahren!
+      </div>
+      <div id="twofa-backup-codes" class="grid grid-cols-2 gap-2 font-mono text-sm bg-gray-50 border border-gray-200 rounded-lg p-4"></div>
+      <button id="twofa-backup-done-btn" type="button"
+        class="px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+        data-i18n="profile.twofa_backup_done">
+        Ich habe die Codes gespeichert
+      </button>
+    </div>
+
+    <!-- State: enabled -->
+    <div id="twofa-enabled-view" class="hidden">
+      <button id="twofa-disable-toggle-btn" type="button"
+        class="px-5 py-2.5 border border-red-200 text-red-700 text-sm font-medium rounded-lg hover:bg-red-50"
+        data-i18n="profile.twofa_disable_button">
+        2FA deaktivieren
+      </button>
+
+      <form id="twofa-disable-form" class="hidden space-y-4 mt-4 pt-4 border-t border-gray-100">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.current_password">Aktuelles Passwort</label>
+          <input type="password" id="disable-password" required autocomplete="current-password"
+            class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="profile.twofa_code_or_backup">Code aus der App oder Backup-Code</label>
+          <input type="text" id="disable-code" required
+            class="w-full max-w-[220px] px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+        </div>
+        <div class="flex gap-3">
+          <button type="submit"
+            class="px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700"
+            data-i18n="profile.twofa_disable_confirm">
+            2FA endgültig deaktivieren
+          </button>
+          <button type="button" id="twofa-cancel-disable-btn"
+            class="px-5 py-2.5 border border-gray-200 text-gray-700 text-sm font-medium rounded-lg hover:bg-gray-50"
+            data-i18n="common.cancel">
+            Abbrechen
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function showMsg(el, text, kind) {
+  el.textContent = text;
+  el.className = 'mb-4 p-3 rounded-lg text-sm ' + (kind === 'error'
+    ? 'bg-red-50 border border-red-200 text-red-700'
+    : 'bg-emerald-50 border border-emerald-200 text-emerald-700');
+}
+
+async function loadProfile() {
+  const resp = await apiCall('GET', '/auth/me');
+  if (!resp || !resp.ok) return;
+  const user = await resp.json();
+  document.getElementById('profile-full-name').textContent = user.full_name;
+  document.getElementById('profile-email').textContent = user.email;
+  document.getElementById('profile-role').textContent = user.role;
+}
+
+async function loadTwoFAStatus() {
+  const resp = await apiCall('GET', '/auth/2fa/status');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  const badge = document.getElementById('twofa-badge');
+  document.getElementById('twofa-disabled-view').classList.toggle('hidden', data.enabled);
+  document.getElementById('twofa-enabled-view').classList.toggle('hidden', !data.enabled);
+  document.getElementById('twofa-setup-view').classList.add('hidden');
+  document.getElementById('twofa-backup-view').classList.add('hidden');
+  badge.classList.remove('hidden');
+  if (data.enabled) {
+    badge.textContent = t('profile.twofa_badge_enabled');
+    badge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700';
+  } else {
+    badge.textContent = t('profile.twofa_badge_disabled');
+    badge.className = 'text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600';
+  }
+}
+
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const msg = document.getElementById('password-msg');
+  msg.classList.add('hidden');
+
+  const current = document.getElementById('current-password').value;
+  const next = document.getElementById('new-password').value;
+  const confirm = document.getElementById('new-password-confirm').value;
+
+  if (next !== confirm) {
+    showMsg(msg, t('profile.password_mismatch'), 'error');
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  const resp = await apiCall('PATCH', '/auth/password', { current_password: current, new_password: next });
+  if (!resp) return;
+  const data = await resp.json();
+  if (!resp.ok) {
+    showMsg(msg, data.detail || t('common.error'), 'error');
+  } else {
+    showMsg(msg, t('profile.password_success'), 'success');
+    document.getElementById('password-form').reset();
+  }
+  msg.classList.remove('hidden');
+});
+
+document.getElementById('twofa-start-btn').addEventListener('click', async () => {
+  const resp = await apiCall('POST', '/auth/2fa/setup');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  document.getElementById('twofa-qr').src = 'data:image/png;base64,' + data.qr_code_png_base64;
+  document.getElementById('twofa-secret').textContent = data.secret;
+  document.getElementById('twofa-disabled-view').classList.add('hidden');
+  document.getElementById('twofa-setup-view').classList.remove('hidden');
+});
+
+document.getElementById('twofa-cancel-setup-btn').addEventListener('click', () => {
+  document.getElementById('twofa-setup-view').classList.add('hidden');
+  document.getElementById('twofa-disabled-view').classList.remove('hidden');
+});
+
+document.getElementById('twofa-confirm-btn').addEventListener('click', async () => {
+  await I18N.ready;
+  const msg = document.getElementById('twofa-msg');
+  msg.classList.add('hidden');
+  const code = document.getElementById('twofa-confirm-code').value;
+
+  const resp = await apiCall('POST', '/auth/2fa/enable', { code });
+  if (!resp) return;
+  const data = await resp.json();
+  if (!resp.ok) {
+    showMsg(msg, data.detail || t('common.error'), 'error');
+    msg.classList.remove('hidden');
+    return;
+  }
+
+  const grid = document.getElementById('twofa-backup-codes');
+  grid.innerHTML = '';
+  data.backup_codes.forEach((code) => {
+    const div = document.createElement('div');
+    div.textContent = code;
+    grid.appendChild(div);
+  });
+  document.getElementById('twofa-setup-view').classList.add('hidden');
+  document.getElementById('twofa-backup-view').classList.remove('hidden');
+});
+
+document.getElementById('twofa-backup-done-btn').addEventListener('click', () => {
+  document.getElementById('twofa-backup-view').classList.add('hidden');
+  loadTwoFAStatus();
+});
+
+document.getElementById('twofa-disable-toggle-btn').addEventListener('click', () => {
+  document.getElementById('twofa-disable-form').classList.toggle('hidden');
+});
+document.getElementById('twofa-cancel-disable-btn').addEventListener('click', () => {
+  document.getElementById('twofa-disable-form').classList.add('hidden');
+  document.getElementById('twofa-disable-form').reset();
+});
+
+document.getElementById('twofa-disable-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const msg = document.getElementById('twofa-msg');
+  msg.classList.add('hidden');
+
+  const resp = await apiCall('POST', '/auth/2fa/disable', {
+    password: document.getElementById('disable-password').value,
+    code: document.getElementById('disable-code').value,
+  });
+  if (!resp) return;
+  const data = await resp.json();
+  if (!resp.ok) {
+    showMsg(msg, data.detail || t('common.error'), 'error');
+    msg.classList.remove('hidden');
+    return;
+  }
+  document.getElementById('twofa-disable-form').classList.add('hidden');
+  document.getElementById('twofa-disable-form').reset();
+  loadTwoFAStatus();
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+  loadProfile();
+  loadTwoFAStatus();
+});
+</script>
+{% endblock %}

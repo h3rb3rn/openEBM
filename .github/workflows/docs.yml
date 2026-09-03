@@ -1,0 +1,47 @@
+name: Dokumentation veröffentlichen
+
+# Baut die MkDocs-Dokumentation aus docs/ und veröffentlicht sie auf
+# GitHub Pages. Läuft automatisch bei Änderungen an der Dokumentation auf
+# dem main-Branch und kann zusätzlich manuell ausgelöst werden.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docs-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: docs/requirements.txt
+
+      - name: Doku-Abhängigkeiten installieren
+        run: pip install -r docs/requirements.txt
+
+      - name: Git-Identität für gh-deploy setzen
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: MkDocs bauen und auf gh-pages veröffentlichen
+        run: mkdocs gh-deploy --force --clean

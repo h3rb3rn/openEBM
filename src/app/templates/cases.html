@@ -1,0 +1,266 @@
+{% extends "base.html" %}
+{% set active_page = "fallakten" %}
+{% block title %}Fallakten – EBM Analyzer{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900" data-i18n="cases.title">Fallakten</h1>
+    <p class="text-sm text-gray-500 mt-0.5" data-i18n="cases.subtitle">Persistente Fallakten mit Human-in-the-Loop-Audit-Log</p>
+  </div>
+
+  <!-- Filters -->
+  <div class="flex gap-3 mb-4">
+    <select id="filter-quartal" onchange="loadCases()"
+      class="px-3.5 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+      <option value="" data-i18n="cases.all_quarters">Alle Quartale</option>
+    </select>
+    <select id="filter-status" onchange="loadCases()"
+      class="px-3.5 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+      <option value="" data-i18n="cases.all_statuses">Alle Status</option>
+      <option value="offen" data-i18n="status.open">Offen</option>
+      <option value="in_bearbeitung" data-i18n="status.in_progress">In Bearbeitung</option>
+      <option value="abgeschlossen" data-i18n="status.closed">Abgeschlossen</option>
+    </select>
+  </div>
+
+  <!-- List -->
+  <div id="case-list" class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+    <div class="flex items-center justify-center py-12"><div class="spinner"></div></div>
+  </div>
+
+  <!-- Detail panel -->
+  <div id="case-detail" class="hidden mt-6 space-y-6"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadCases() {
+  const quartal = document.getElementById('filter-quartal').value;
+  const status  = document.getElementById('filter-status').value;
+  let url = '/cases/?';
+  if (quartal) url += `quartal=${quartal}&`;
+  if (status)  url += `status=${status}&`;
+
+  const resp = await apiCall('GET', url);
+  if (!resp || !resp.ok) return;
+  const cases = await resp.json();
+
+  // Populate quarter filter from the data itself
+  const quartals = [...new Set(cases.map(c => c.quartal))].sort().reverse();
+  const qSelect = document.getElementById('filter-quartal');
+  const currentQ = qSelect.value;
+  qSelect.innerHTML = `<option value="">${t('cases.all_quarters')}</option>`;
+  quartals.forEach(q => {
+    const opt = document.createElement('option');
+    opt.value = q;
+    opt.textContent = q;
+    if (q === currentQ) opt.selected = true;
+    qSelect.appendChild(opt);
+  });
+
+  renderCaseList(cases);
+
+  // Support deep-linking to a case via ?id=<uuid>
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get('id');
+  if (id) openCase(id);
+}
+
+function renderCaseList(cases) {
+  const container = document.getElementById('case-list');
+  if (cases.length === 0) {
+    container.innerHTML = `<div class="text-center py-12 text-gray-400 text-sm">${t('cases.none_found')}</div>`;
+    return;
+  }
+  const statusBadge = s => ({
+    offen: `<span class="badge-vorgeschlagen px-2 py-0.5 rounded text-xs font-medium">${t('status.open')}</span>`,
+    in_bearbeitung: `<span class="px-2 py-0.5 rounded text-xs font-medium bg-blue-50 border border-blue-200 text-blue-700">${t('status.in_progress')}</span>`,
+    abgeschlossen: `<span class="badge-akzeptiert px-2 py-0.5 rounded text-xs font-medium">${t('status.closed')}</span>`,
+  })[s] || s;
+
+  container.innerHTML = `
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+        <th class="px-5 py-3 font-medium">${t('common.patient')}</th>
+        <th class="px-4 py-3 font-medium">${t('cases.th_treatment')}</th>
+        <th class="px-4 py-3 font-medium">${t('common.quarter')}</th>
+        <th class="px-4 py-3 font-medium">GOPs</th>
+        <th class="px-4 py-3 font-medium">${t('common.status')}</th>
+        <th class="px-4 py-3 font-medium"></th>
+      </tr></thead>
+      <tbody>
+        ${cases.map(c => `
+          <tr class="border-b border-gray-50 hover:bg-gray-50 cursor-pointer" onclick="openCase('${c.id}')">
+            <td class="px-5 py-3 font-medium">${c.patient_name || '–'}</td>
+            <td class="px-4 py-3 text-gray-600">${c.treatment_date}</td>
+            <td class="px-4 py-3 text-gray-600 font-mono text-xs">${c.quartal}</td>
+            <td class="px-4 py-3">
+              <span class="text-emerald-600 font-medium">${c.accepted_count}✓</span>
+              <span class="text-gray-400 mx-1">/</span>
+              <span class="text-gray-600">${c.gop_count}</span>
+              ${c.rejected_count > 0 ? `<span class="text-red-500 ml-1">${c.rejected_count}✗</span>` : ''}
+            </td>
+            <td class="px-4 py-3">${statusBadge(c.status)}</td>
+            <td class="px-4 py-3"><span class="text-sky-600 text-xs font-medium">${t('cases.detail_link')}</span></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+async function openCase(caseId) {
+  const resp = await apiCall('GET', `/cases/${caseId}`);
+  if (!resp || !resp.ok) return;
+  const cas = await resp.json();
+
+  const detail = document.getElementById('case-detail');
+  detail.classList.remove('hidden');
+
+  const statusColor = {
+    vorgeschlagen: '#FEF3C7', akzeptiert: '#D1FAE5', abgelehnt: '#FEE2E2'
+  };
+  const borderColor = {
+    vorgeschlagen: '#F59E0B', akzeptiert: '#10B981', abgelehnt: '#EF4444'
+  };
+  const gopStatusLabel = s => ({
+    vorgeschlagen: t('gop.suggested'), akzeptiert: t('gop.accepted'), abgelehnt: t('gop.rejected'),
+  })[s] || s;
+
+  detail.innerHTML = `
+    <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="font-semibold text-gray-800">${t('cases.case_heading')} – ${cas.treatment_date} (${cas.quartal})</h2>
+          <div class="text-sm text-gray-400 font-mono mt-0.5">${cas.id}</div>
+        </div>
+        ${cas.status !== 'abgeschlossen' ? `
+          <button onclick="closeCase('${cas.id}')"
+            class="px-4 py-2 bg-emerald-600 text-white text-sm rounded-lg hover:bg-emerald-700">
+            ${t('cases.close_case')}
+          </button>
+        ` : `<span class="badge-akzeptiert px-3 py-1.5 rounded-lg text-sm font-medium">${t('status.closed')}</span>`}
+      </div>
+
+      <!-- Physician report with GOP annotations -->
+      <div class="mb-6">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-medium text-gray-700">${t('cases.report_heading')}</h3>
+          <button onclick="toggleReport('${cas.id}')" id="report-toggle-${cas.id}"
+            class="text-xs text-sky-600 hover:text-sky-800">${t('cases.show')}</button>
+        </div>
+        <div id="report-body-${cas.id}" class="hidden">
+          <div id="annotated-report-${cas.id}"
+            class="text-sm font-mono leading-loose whitespace-pre-wrap p-4 bg-gray-50 rounded-lg border border-gray-100 max-h-72 overflow-y-auto">
+          </div>
+        </div>
+      </div>
+
+      <!-- GOP cards -->
+      <h3 class="font-medium text-gray-700 mb-3">${t('cases.gop_suggestions')}</h3>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
+        ${cas.gop_suggestions.map(g => `
+          <div class="p-3 rounded-lg border" style="background:${statusColor[g.status]||'#f9fafb'}; border-color:${borderColor[g.status]||'#e5e7eb'}">
+            <div class="flex items-start justify-between gap-1 mb-0.5">
+              <span class="font-mono font-bold text-gray-900">${g.gop_code}</span>
+              <span class="text-xs text-gray-400 whitespace-nowrap">${Math.round((g.confidence||0)*100)}%</span>
+            </div>
+            <div class="text-xs text-gray-600 line-clamp-2">${g.gop_description || '–'}</div>
+            ${g.source_text ? `<div class="text-xs text-sky-700 mt-1 font-mono bg-sky-50 px-1.5 py-0.5 rounded truncate" title="${g.source_text.replace(/"/g,'&quot;')}">"${g.source_text}"</div>` : ''}
+            ${g.reasoning ? `<div class="text-xs text-gray-400 mt-1 italic line-clamp-2" title="${g.reasoning.replace(/"/g,'&quot;')}">${g.reasoning}</div>` : ''}
+            <div class="flex gap-1.5 mt-2">
+              ${g.status === 'vorgeschlagen' ? `
+                <button onclick="hitlAction('${cas.id}', '${g.id}', 'accept')"
+                  class="flex-1 py-1 bg-emerald-600 text-white text-xs rounded-md hover:bg-emerald-700">✓ ${t('cases.accept')}</button>
+                <button onclick="hitlAction('${cas.id}', '${g.id}', 'reject')"
+                  class="flex-1 py-1 bg-red-500 text-white text-xs rounded-md hover:bg-red-600">✗ ${t('cases.reject')}</button>
+              ` : `<span class="text-xs font-medium px-2 py-0.5 rounded" style="background:${statusColor[g.status]};border:1px solid ${borderColor[g.status]}">${gopStatusLabel(g.status)}</span>`}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+
+      <!-- Audit log -->
+      <h3 class="font-medium text-gray-700 mb-3">${t('cases.audit_log')}</h3>
+      <div class="space-y-2">
+        ${cas.audit_trail.map(a => `
+          <div class="flex items-start gap-3 text-xs py-2 border-b border-gray-50">
+            <div class="text-gray-400 w-36 flex-shrink-0">${a.created_at.substring(0,16)}</div>
+            <div class="font-medium text-gray-700">${a.action}</div>
+            ${a.gop_code ? `<div class="font-mono text-sky-700">${a.gop_code}</div>` : ''}
+            ${a.reason ? `<div class="text-gray-500 italic">"${a.reason}"</div>` : ''}
+          </div>
+        `).join('') || `<div class="text-gray-400 text-xs">${t('cases.no_audit')}</div>`}
+      </div>
+    </div>
+  `;
+  detail.scrollIntoView({ behavior: 'smooth' });
+
+  // Highlight GOP text anchors inside the report
+  annotateReport(cas);
+}
+
+/**
+ * Render the stored report text with <mark> highlights at the character
+ * offsets the LLM anchored each GOP suggestion to.
+ */
+function annotateReport(cas) {
+  const el = document.getElementById(`annotated-report-${cas.id}`);
+  if (!el) return;
+
+  const text = cas.report_text || '';
+  const gops = cas.gop_suggestions.filter(g => g.start_char != null && g.end_char != null && g.end_char > g.start_char);
+
+  if (!gops.length) {
+    el.textContent = text;
+    return;
+  }
+
+  const sorted = [...gops].sort((a, b) => a.start_char - b.start_char);
+  let html = '';
+  let pos = 0;
+
+  const esc = s => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const colors = ['#FEF3C7','#D1FAE5','#DBEAFE','#EDE9FE','#FCE7F3','#FEE2E2','#CCFBF1','#FFF7ED'];
+  const borders = ['#F59E0B','#10B981','#3B82F6','#8B5CF6','#EC4899','#EF4444','#14B8A6','#F97316'];
+  const idx = code => parseInt(code, 10) % colors.length;
+
+  for (const g of sorted) {
+    if (g.start_char > pos) html += esc(text.slice(pos, g.start_char));
+    const end = Math.min(g.end_char, text.length);
+    const i = idx(g.gop_code);
+    html += `<mark title="${esc(g.gop_code)}" style="background:${colors[i]};border-bottom:2px solid ${borders[i]};border-radius:2px;padding:0 2px;cursor:default">${esc(text.slice(g.start_char, end))}</mark>`;
+    pos = end;
+  }
+  if (pos < text.length) html += esc(text.slice(pos));
+  el.innerHTML = html;
+}
+
+function toggleReport(caseId) {
+  const body = document.getElementById(`report-body-${caseId}`);
+  const btn  = document.getElementById(`report-toggle-${caseId}`);
+  const hidden = body.classList.toggle('hidden');
+  btn.textContent = hidden ? t('cases.show') : t('cases.hide');
+}
+
+async function hitlAction(caseFileId, gopId, action) {
+  let reason = null;
+  if (action === 'reject') reason = prompt(t('cases.reject_reason_prompt'));
+  const url = `/analysis/cases/${caseFileId}/gops/${gopId}/${action}`;
+  const resp = await apiCall('POST', url, reason ? { reason } : null);
+  if (resp && resp.ok) openCase(caseFileId);
+}
+
+async function closeCase(caseId) {
+  if (!confirm(t('cases.confirm_close'))) return;
+  const resp = await apiCall('PATCH', `/cases/${caseId}/close`);
+  if (resp && resp.ok) { await loadCases(); openCase(caseId); }
+}
+
+document.addEventListener('DOMContentLoaded', loadCases);
+</script>
+{% endblock %}

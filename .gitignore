@@ -1,0 +1,52 @@
+# ─── Secrets & lokale Konfiguration ──────────────────────────────────
+# Enthält echte Passwörter, API-Keys und JWT-Secrets - niemals committen.
+# .env.example bleibt bewusst getrackt als Vorlage.
+.env
+.env.*.local
+*.pem
+*.key
+
+# ─── Python ───────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+
+# ─── Node / Frontend-Build ─────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+# Kompiliertes Tailwind-CSS wird beim Docker-Build erzeugt (siehe
+# docker/app.Dockerfile, Stage frontend-build) - nicht versionieren.
+src/app/static/css/tailwind.css
+
+# ─── MkDocs ────────────────────────────────────────────────────────────
+# Von "mkdocs build" erzeugtes statisches Ausgabeverzeichnis.
+site/
+
+# ─── Logs ──────────────────────────────────────────────────────────────
+*.log
+
+# ─── Editor / IDE ──────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ─── Claude Code lokaler Tool-Status ────────────────────────────────────
+.claude/
+
+# ─── Betriebssystem ─────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── Docker ─────────────────────────────────────────────────────────────
+# Lokale Overrides für Entwicklung, nicht für den Standard-Stack gedacht.
+docker-compose.override.yml

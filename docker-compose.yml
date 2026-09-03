@@ -1,0 +1,292 @@
+version: "3.9"
+
+# EBM Analyzer – Sovereign AI Stack
+# Podman-compatible: keine privilegierten Container, named volumes statt bind-mounts für Daten
+# Netzwerk: ebm-internal (intern, kein direkter Zugang von außen außer app-Port)
+
+services:
+
+  # ─────────────────────────── POSTGRES ───────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ebm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ebm_db
+      POSTGRES_USER: ${POSTGRES_USER:-ebm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_prod}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=de_DE.UTF-8"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init/postgres:/docker-entrypoint-initdb.d:ro
+    networks:
+      - ebm-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-ebm_user} -d ebm_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── BACKUP ─────────────────────────────
+  # Daily pg_dump with retention. Only PostgreSQL is backed up — Neo4j
+  # and ChromaDB are fully regenerable from the KBV catalog via the admin
+  # import feature, so backing them up separately would just be a second
+  # copy of derived data. See docker/backup.sh for the restore path.
+  backup:
+    image: postgres:16-alpine
+    container_name: ebm-backup
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ebm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_prod}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+    volumes:
+      - backup_data:/backups
+      - ./docker/backup.sh:/backup.sh:ro
+      - ./docker/restore.sh:/restore.sh:ro
+    entrypoint: ["/bin/sh", "/backup.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ebm-internal
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── VALKEY ─────────────────────────────
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: ebm-valkey
+    restart: unless-stopped
+    command: >
+      valkey-server
+      --save ""
+      --appendonly no
+      --requirepass ${VALKEY_PASSWORD:-changeme_prod}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - valkey_data:/data
+    networks:
+      - ebm-internal
+    healthcheck:
+      test: ["CMD", "valkey-cli", "-a", "${VALKEY_PASSWORD:-changeme_prod}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── CHROMADB ───────────────────────────
+  chromadb:
+    image: chromadb/chroma:0.5.20
+    container_name: ebm-chromadb
+    restart: unless-stopped
+    environment:
+      CHROMA_SERVER_AUTHN_CREDENTIALS: ${CHROMA_TOKEN:-changeme_prod}
+      CHROMA_SERVER_AUTHN_PROVIDER: chromadb.auth.token_authn.TokenAuthenticationServerProvider
+      IS_PERSISTENT: "TRUE"
+      PERSIST_DIRECTORY: /chroma/chroma
+      ANONYMIZED_TELEMETRY: "FALSE"
+    volumes:
+      - chroma_data:/chroma/chroma
+    networks:
+      - ebm-internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/heartbeat')\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── NEO4J ──────────────────────────────
+  neo4j:
+    image: neo4j:5.24-community
+    container_name: ebm-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-changeme_prod}
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*"
+      NEO4J_dbms_security_procedures_allowlist: "apoc.*"
+      NEO4J_server_memory_heap_initial__size: "512m"
+      NEO4J_server_memory_heap_max__size: "1G"
+      NEO4J_server_memory_pagecache_size: "512m"
+      NEO4J_dbms_default__database: neo4j
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+      - neo4j_plugins:/plugins
+    networks:
+      - ebm-internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474 || exit 1"]
+      interval: 20s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── MCP SERVER ─────────────────────────
+  mcp-server:
+    build:
+      context: .
+      dockerfile: docker/mcp.Dockerfile
+    container_name: ebm-mcp
+    restart: unless-stopped
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-changeme_prod}
+      VALKEY_URL: "redis://:${VALKEY_PASSWORD:-changeme_prod}@valkey:6379/1"
+      POSTGRES_DSN: "postgresql+asyncpg://${POSTGRES_USER:-ebm_user}:${POSTGRES_PASSWORD:-changeme_prod}@postgres:5432/ebm_db"
+      MCP_SECRET: ${MCP_SECRET:-changeme_mcp_secret}
+      MCP_PORT: "8001"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    networks:
+      - ebm-internal
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\""]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────────── FASTAPI APP ────────────────────────
+  app:
+    build:
+      context: .
+      dockerfile: docker/app.Dockerfile
+    container_name: ebm-app
+    restart: unless-stopped
+    ports:
+      - "${APP_HOST:-127.0.0.1}:${APP_PORT:-8080}:8000"
+    environment:
+      # Superuser connection — migrations only (DDL needs elevated
+      # privileges; also used by app-entrypoint.sh to set the restricted
+      # role's password below).
+      DATABASE_URL: "postgresql+asyncpg://${POSTGRES_USER:-ebm_user}:${POSTGRES_PASSWORD:-changeme_prod}@postgres:5432/ebm_db"
+      POSTGRES_USER: ${POSTGRES_USER:-ebm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme_prod}
+      # Restricted, NOSUPERUSER/NOBYPASSRLS role — the app's actual runtime
+      # connection, so row-level-security policies apply. See
+      # alembic/versions/..._create_restricted_app_role.py.
+      APP_DATABASE_URL: "postgresql+asyncpg://ebm_app:${APP_DB_PASSWORD:-changeme_prod_app}@postgres:5432/ebm_db"
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-changeme_prod_app}
+      VALKEY_URL: "redis://:${VALKEY_PASSWORD:-changeme_prod}@valkey:6379/0"
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      CHROMA_TOKEN: ${CHROMA_TOKEN:-changeme_prod}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-changeme_prod}
+      MCP_SERVER_URL: "http://mcp-server:8001"
+      MCP_SECRET: ${MCP_SECRET:-changeme_mcp_secret}
+      SECRET_KEY: ${SECRET_KEY:-changeme_jwt_secret_min_32_chars_prod}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES:-480}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-llama3.1:8b}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-changeme_openai_api_key}
+      OPENAI_MODEL: ${OPENAI_MODEL:-qwen3.6:35b@N04-RTX}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL:-https://api.moe-sovereign.org/v1}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SESSION_TTL_SECONDS: ${SESSION_TTL_SECONDS:-3600}
+      EBM_CATALOG_PATH: /data/ebm_catalog.json
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-true}
+      SMTP_FROM: ${SMTP_FROM:-EBM Analyzer <noreply@example.org>}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+    volumes:
+      - ebm_catalog_data:/data
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+    networks:
+      - ebm-internal
+    security_opt:
+      - no-new-privileges:true
+
+  # ─────────────────────── INGESTION (einmalig / on-demand) ───────
+  ingestion:
+    build:
+      context: .
+      dockerfile: docker/ingestion.Dockerfile
+    container_name: ebm-ingestion
+    restart: "no"
+    profiles: ["ingestion"]
+    environment:
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-changeme_prod}
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: "8000"
+      CHROMA_TOKEN: ${CHROMA_TOKEN:-changeme_prod}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-nomic-embed-text}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      EBM_CATALOG_PATH: /data/ebm_catalog.json
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    volumes:
+      - ebm_catalog_data:/data
+    depends_on:
+      neo4j:
+        condition: service_healthy
+      chromadb:
+        condition: service_healthy
+    networks:
+      - ebm-internal
+
+volumes:
+  postgres_data:
+    driver: local
+  backup_data:
+    driver: local
+  valkey_data:
+    driver: local
+  chroma_data:
+    driver: local
+  neo4j_data:
+    driver: local
+  neo4j_logs:
+    driver: local
+  neo4j_plugins:
+    driver: local
+  ebm_catalog_data:
+    driver: local
+
+networks:
+  ebm-internal:
+    driver: bridge
+    internal: false

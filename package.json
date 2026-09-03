@@ -1,0 +1,12 @@
+{
+  "name": "ebm-analyzer-frontend",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Build-time Tailwind CSS compilation for air-gapped deployment (no CDN, no runtime JIT).",
+  "scripts": {
+    "build:css": "tailwindcss -i ./src/app/static/css/input.css -o ./src/app/static/css/tailwind.css --minify"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.13"
+  }
+}

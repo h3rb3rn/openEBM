@@ -1,0 +1,543 @@
+{% extends "base.html" %}
+{% set active_page = "analyse" %}
+{% block title %}Analyse – EBM Analyzer{% endblock %}
+
+{% block content %}
+<style>
+.toggle-btn { background-color: #d1d5db; }
+.toggle-btn.active { background-color: #0ea5e9; }
+.toggle-dot { transform: translateX(2px); }
+.toggle-btn.active .toggle-dot { transform: translateX(22px); }
+</style>
+<div class="p-6 max-w-7xl mx-auto">
+
+  <!-- Header + mode toggle -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900" data-i18n="analysis.title">EBM-Analyse</h1>
+      <p class="text-sm text-gray-500 mt-0.5" data-i18n="analysis.subtitle">RAG + LLM (probabilistisch) → MCP-Validierung (deterministisch)</p>
+    </div>
+    <div class="flex bg-gray-100 rounded-lg p-1 gap-1" id="mode-toggle">
+      <button onclick="setMode('instant')" id="btn-instant"
+        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all" data-i18n="analysis.mode_instant">
+        ⚡ Instant
+      </button>
+      <button onclick="setMode('persistent')" id="btn-persistent"
+        class="px-4 py-1.5 rounded-md text-sm font-medium transition-all" data-i18n="analysis.mode_persistent">
+        📁 Fallakte
+      </button>
+    </div>
+  </div>
+
+  <!-- Form -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left column: input -->
+    <div class="lg:col-span-2 space-y-4">
+
+      <!-- Mode banner -->
+      <div id="mode-banner" class="p-3 rounded-lg border text-sm hidden">
+        <div id="mode-banner-text"></div>
+      </div>
+
+      <!-- Patient selection (persistent mode) -->
+      <div id="patient-section" class="bg-white border border-gray-200 rounded-xl p-5 hidden">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="common.patient">Patient</h3>
+        <div class="flex gap-3">
+          <select id="patient-select" class="flex-1 px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+            <option value="" data-i18n="analysis.select_patient">Patient auswählen...</option>
+          </select>
+          <input type="date" id="treatment-date" class="px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Anonymous patient info (instant mode) -->
+      <div id="instant-patient-section" class="bg-white border border-gray-200 rounded-xl p-5 hidden">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.anon_patient_info">Anonyme Patienteninformationen (optional)</h3>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block" data-i18n="common.date_of_birth">Geburtsdatum</label>
+            <input type="date" id="instant-dob" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block" data-i18n="common.gender">Geschlecht</label>
+            <select id="instant-gender" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="">–</option>
+              <option value="m" data-i18n="common.male">Männlich</option>
+              <option value="w" data-i18n="common.female">Weiblich</option>
+              <option value="d" data-i18n="common.diverse">Divers</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs text-gray-500 mb-1 block" data-i18n="common.insurance_type">Kassenart</label>
+            <select id="instant-insurance" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+              <option value="GKV">GKV</option>
+              <option value="PKV">PKV</option>
+              <option value="SELBSTZAHLER" data-i18n="common.self_payer">Selbstzahler</option>
+              <option value="BG">BG</option>
+            </select>
+          </div>
+        </div>
+        <div class="mt-3">
+          <label class="text-xs text-gray-500 mb-1 block" data-i18n="common.treatment_date">Behandlungsdatum</label>
+          <input type="date" id="instant-date" class="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        </div>
+      </div>
+
+      <!-- Shared analysis options (model + switches, both modes) -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.options_heading">Analyse-Optionen</h3>
+        <div class="mb-3">
+          <label class="text-xs text-gray-500 mb-1 block flex items-center gap-1.5">
+            <span data-i18n="analysis.model_label">KI-Modell</span>
+            <span id="model-loading" class="hidden w-3 h-3 border-2 border-gray-300 border-t-sky-500 rounded-full animate-spin"></span>
+          </label>
+          <input id="analysis-model" list="model-datalist"
+            placeholder="Wird geladen…" data-i18n-placeholder="analysis.model_loading"
+            autocomplete="off" spellcheck="false"
+            class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none font-mono">
+          <datalist id="model-datalist"></datalist>
+        </div>
+        <div class="pt-3 border-t border-gray-100 space-y-2.5">
+          <label class="flex items-center justify-between cursor-pointer">
+            <div>
+              <span class="text-sm text-gray-700 font-medium" data-i18n="analysis.kb_title">Wissensdatenbank</span>
+              <p class="text-xs text-gray-400" data-i18n="analysis.kb_desc">Semantische GOP-Kandidaten via RAG</p>
+            </div>
+            <button type="button" id="toggle-rag" onclick="toggleOpt('rag')"
+              class="toggle-btn active relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+              <span class="toggle-dot inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
+            </button>
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <div>
+              <span class="text-sm text-gray-700 font-medium" data-i18n="analysis.cache_title">Session-Cache</span>
+              <p class="text-xs text-gray-400" data-i18n="analysis.cache_desc">Ergebnis in Valkey zwischenspeichern</p>
+            </div>
+            <button type="button" id="toggle-cache" onclick="toggleOpt('cache')"
+              class="toggle-btn active relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+              <span class="toggle-dot inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
+            </button>
+          </label>
+          <label class="flex items-center justify-between cursor-pointer">
+            <div>
+              <span class="text-sm text-gray-700 font-medium" data-i18n="analysis.reasoning_title">Reasoning</span>
+              <p class="text-xs text-gray-400" data-i18n="analysis.reasoning_desc">Chain-of-Thought aktivieren (langsamer)</p>
+            </div>
+            <button type="button" id="toggle-reasoning" onclick="toggleOpt('reasoning')"
+              class="toggle-btn relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none">
+              <span class="toggle-dot inline-block h-4 w-4 rounded-full bg-white shadow transition-transform"></span>
+            </button>
+          </label>
+        </div>
+      </div>
+
+      <!-- Report text -->
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.report_heading">Medizinischer Bericht</h3>
+        <textarea id="report-text" rows="12"
+          placeholder="Arztbrief oder medizinischen Bericht hier einfügen..."
+          data-i18n-placeholder="analysis.report_placeholder"
+          class="w-full px-3.5 py-3 border border-gray-200 rounded-lg text-sm font-mono leading-relaxed focus:ring-2 focus:ring-sky-500 focus:outline-none resize-y"></textarea>
+        <div class="mt-2 flex items-center justify-between">
+          <button onclick="loadSampleText()" class="text-xs text-gray-400 hover:text-gray-600" data-i18n="analysis.load_sample">Beispieltext laden</button>
+          <span id="char-count" class="text-xs text-gray-400">0</span>
+        </div>
+      </div>
+
+      <div id="error-banner" class="hidden p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+        <div class="flex items-start gap-2">
+          <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <div>
+            <div class="font-semibold mb-0.5" data-i18n="analysis.error_heading">Analysefehler</div>
+            <div id="error-text"></div>
+          </div>
+        </div>
+      </div>
+
+      <button onclick="runAnalysis()" id="analyse-btn"
+        class="w-full py-3 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-xl transition-colors flex items-center justify-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <span data-i18n="analysis.start_button">Analyse starten</span>
+      </button>
+    </div>
+
+    <!-- Right column: result panels -->
+    <div class="space-y-4">
+      <div id="legend-panel" class="bg-white border border-gray-200 rounded-xl p-5 hidden">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.legend_heading">GOP-Legende</h3>
+        <div id="legend-items" class="space-y-2"></div>
+      </div>
+
+      <div id="mcp-summary-panel" class="bg-white border border-gray-200 rounded-xl p-5 hidden">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.mcp_heading">MCP-Validierung</h3>
+        <div id="mcp-summary"></div>
+      </div>
+
+      <div id="rejected-panel" class="bg-white border border-gray-200 rounded-xl p-5 hidden">
+        <h3 class="font-semibold text-gray-700 mb-3" data-i18n="analysis.rejected_heading">Abgelehnte GOPs</h3>
+        <div id="rejected-items" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Annotated report text -->
+  <div id="result-section" class="mt-6 hidden">
+    <div class="bg-white border border-gray-200 rounded-xl p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-800" data-i18n="analysis.annotated_heading">Annotierter Bericht</h2>
+        <div class="flex gap-2 items-center">
+          <a id="gdt-download-link" href="#" class="hidden items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-xs text-gray-600 hover:bg-gray-50"
+            title="GDT-Export für PVS-Import herunterladen" data-i18n-title="analysis.gdt_export_title">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17v3a1 1 0 001 1h16a1 1 0 001-1v-3"/></svg>
+            <span data-i18n="analysis.gdt_export">GDT Export</span>
+          </a>
+          <div class="flex gap-2" id="hitl-controls"></div>
+        </div>
+      </div>
+      <div id="annotated-text" class="text-sm font-mono leading-loose whitespace-pre-wrap p-4 bg-gray-50 rounded-lg border border-gray-100"></div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/highlighter.js"></script>
+<script>
+let currentMode = new URLSearchParams(window.location.search).get('mode') || 'instant';
+let analysisResult = null;
+
+function setMode(mode) {
+  currentMode = mode;
+  const btnInstant = document.getElementById('btn-instant');
+  const btnPersistent = document.getElementById('btn-persistent');
+  const patientSection = document.getElementById('patient-section');
+  const instantSection = document.getElementById('instant-patient-section');
+  const banner = document.getElementById('mode-banner');
+  const bannerText = document.getElementById('mode-banner-text');
+
+  if (mode === 'instant') {
+    btnInstant.className = 'px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow text-sky-700';
+    btnPersistent.className = 'px-4 py-1.5 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700';
+    patientSection.classList.add('hidden');
+    instantSection.classList.remove('hidden');
+    banner.className = 'p-3 rounded-lg border text-sm bg-sky-50 border-sky-200 text-sky-700';
+    bannerText.textContent = t('analysis.instant_banner');
+    banner.classList.remove('hidden');
+  } else {
+    btnPersistent.className = 'px-4 py-1.5 rounded-md text-sm font-medium bg-white shadow text-emerald-700';
+    btnInstant.className = 'px-4 py-1.5 rounded-md text-sm font-medium text-gray-500 hover:text-gray-700';
+    patientSection.classList.remove('hidden');
+    instantSection.classList.add('hidden');
+    banner.className = 'p-3 rounded-lg border text-sm bg-emerald-50 border-emerald-200 text-emerald-700';
+    bannerText.textContent = t('analysis.persistent_banner');
+    banner.classList.remove('hidden');
+    loadPatients();
+  }
+
+  // Prefill treatment date with today
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('instant-date').value = today;
+  document.getElementById('treatment-date') && (document.getElementById('treatment-date').value = today);
+
+  loadAvailableModels();
+}
+
+// ─── Option toggles ──────────────────────────────────────────────────
+const _toggleState = { rag: true, cache: true, reasoning: false };
+
+function toggleOpt(key) {
+  _toggleState[key] = !_toggleState[key];
+  const btn = document.getElementById('toggle-' + key);
+  if (!btn) return;
+  btn.classList.toggle('active', _toggleState[key]);
+}
+
+function getToggleValues() {
+  return { use_rag: _toggleState.rag, use_cache: _toggleState.cache, reasoning: _toggleState.reasoning };
+}
+
+// ─── Model list ──────────────────────────────────────────────────────
+async function loadAvailableModels() {
+  const spinner = document.getElementById('model-loading');
+  if (spinner) spinner.classList.remove('hidden');
+
+  const resp = await apiCall('GET', '/analysis/models');
+  if (spinner) spinner.classList.add('hidden');
+  if (!resp || !resp.ok) return;
+
+  const data = await resp.json();
+  const models = data.models || [];
+  const defaultModel = data.default_model || (models[0]?.id || '');
+
+  const dl = document.getElementById('model-datalist');
+  if (dl) {
+    dl.innerHTML = '';
+    models.forEach(m => {
+      const opt = document.createElement('option');
+      opt.value = m.id;
+      dl.appendChild(opt);
+    });
+  }
+
+  // Preselect the configured default model
+  const modelInp = document.getElementById('analysis-model');
+  if (modelInp) {
+    if (!modelInp.value) modelInp.value = defaultModel;
+    modelInp.placeholder = defaultModel;
+  }
+}
+
+async function loadPatients() {
+  const resp = await apiCall('GET', '/patients/');
+  if (!resp || !resp.ok) return;
+  const patients = await resp.json();
+  const select = document.getElementById('patient-select');
+  select.innerHTML = `<option value="">${t('analysis.select_patient')}</option>`;
+  patients.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p.id;
+    opt.textContent = `${p.last_name}, ${p.first_name} (${p.patient_number})`;
+    opt.dataset.insurance = p.insurance_type;
+    select.appendChild(opt);
+  });
+}
+
+async function runAnalysis() {
+  const reportText = document.getElementById('report-text').value.trim();
+  if (!reportText) { alert(t('analysis.enter_text_alert')); return; }
+
+  const btn = document.getElementById('analyse-btn');
+  btn.disabled = true;
+  btn.innerHTML = `<div class="spinner w-5 h-5"></div><span>${t('analysis.analyzing')}</span>`;
+
+  try {
+    let endpoint, body;
+
+    const opts = getToggleValues();
+    if (currentMode === 'instant') {
+      endpoint = '/analysis/instant';
+      body = {
+        report_text: reportText,
+        insurance_type: document.getElementById('instant-insurance').value || 'GKV',
+        treatment_date: document.getElementById('instant-date').value || new Date().toISOString().split('T')[0],
+        patient_dob: document.getElementById('instant-dob').value || null,
+        patient_gender: document.getElementById('instant-gender').value || null,
+        model: document.getElementById('analysis-model').value.trim() || null,
+        ...opts,
+      };
+    } else {
+      const patientId = document.getElementById('patient-select').value;
+      if (!patientId) { alert(t('analysis.select_patient_alert')); return; }
+      endpoint = '/analysis/persistent';
+      body = {
+        patient_id: patientId,
+        report_text: reportText,
+        treatment_date: document.getElementById('treatment-date').value || new Date().toISOString().split('T')[0],
+        model: document.getElementById('analysis-model').value.trim() || null,
+        ...opts,
+      };
+    }
+
+    const resp = await apiCall('POST', endpoint, body);
+    if (!resp) return;
+
+    if (!resp.ok) {
+      let detail = `HTTP ${resp.status}`;
+      try {
+        const err = await resp.json();
+        detail = err.detail || detail;
+      } catch (_) {
+        // Server returned no JSON (e.g. reverse-proxy error page)
+        detail = t('analysis.server_error', { status: resp.status });
+      }
+      showError(detail);
+      return;
+    }
+
+    analysisResult = await resp.json();
+    window.analysisResult = analysisResult;
+    renderResults(analysisResult);
+    offerGDTExport(analysisResult);
+
+  } catch (err) {
+    showError(t('analysis.network_error') + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = `<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>${t('analysis.start_button')}`;
+  }
+}
+
+function renderResults(result) {
+  document.getElementById('result-section').classList.remove('hidden');
+  document.getElementById('legend-panel').classList.remove('hidden');
+  document.getElementById('mcp-summary-panel').classList.remove('hidden');
+
+  // Annotated report text
+  const annotated = highlightText(result.report_text, result.gop_results);
+  document.getElementById('annotated-text').innerHTML = annotated;
+
+  // Legend
+  const legendItems = document.getElementById('legend-items');
+  legendItems.innerHTML = result.gop_results.map(gop => `
+    <div class="flex items-start gap-2.5 p-2.5 rounded-lg border hover:shadow-sm transition-shadow cursor-pointer"
+         style="background:${gop.color_bg}; border-color:${gop.color_border}"
+         onclick="toggleGOPStatus('${gop.gop_code}', '${result.case_file_id || ''}')">
+      <div class="w-3 h-3 rounded-sm mt-0.5 flex-shrink-0" style="background:${gop.color_border}"></div>
+      <div class="min-w-0">
+        <div class="font-mono font-bold text-sm">${gop.gop_code}</div>
+        <div class="text-xs text-gray-600 mt-0.5 line-clamp-2">${gop.description || '–'}</div>
+        <div class="mt-1 flex items-center gap-2">
+          <span class="text-xs font-medium opacity-70">${Math.round(gop.confidence * 100)}%</span>
+          <span class="gop-status-badge-${gop.gop_code} text-xs px-1.5 py-0.5 rounded badge-vorgeschlagen">${t('gop.suggested')}</span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+
+  // MCP validation summary
+  document.getElementById('mcp-summary').innerHTML = `
+    <div class="space-y-2 text-sm">
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-green-400"></div>
+        <span><strong>${result.gop_results.length}</strong> ${t('analysis.gops_validated')}</span>
+      </div>
+      <div class="flex items-center gap-2">
+        <div class="w-2 h-2 rounded-full bg-red-400"></div>
+        <span><strong>${result.rejected_gops.length}</strong> ${t('analysis.gops_rejected')}</span>
+      </div>
+      <div class="text-xs text-gray-400 mt-2">${t('common.quarter')}: ${result.quartal}</div>
+      ${result.mode === 'instant' ? `<div class="text-xs text-sky-600 mt-1">Session: ${result.session_id?.substring(0,8)}…</div>` : `<div class="text-xs text-emerald-600 mt-1">${t('cases.case_heading')}: ${result.case_file_id?.substring(0,8)}…</div>`}
+    </div>
+  `;
+
+  // Rejected GOPs
+  if (result.rejected_gops.length > 0) {
+    document.getElementById('rejected-panel').classList.remove('hidden');
+    document.getElementById('rejected-items').innerHTML = result.rejected_gops.map(r => `
+      <div class="p-2.5 bg-red-50 border border-red-100 rounded-lg text-xs">
+        <div class="font-mono font-bold text-red-800">${r.code}</div>
+        <div class="text-red-600 mt-0.5">${r.reason || t('analysis.rule_violated')}</div>
+        <div class="text-red-400 mt-0.5 capitalize">${t('analysis.stage')}: ${r.validation_stage || t('common.unknown')}</div>
+      </div>
+    `).join('');
+  }
+
+  // Human-in-the-loop controls (persistent mode only)
+  if (result.mode === 'persistent' && result.case_file_id) {
+    document.getElementById('hitl-controls').innerHTML = `
+      <span class="text-xs text-gray-500 mr-2">${t('cases.case_heading')}: ${result.case_file_id.substring(0,8)}…</span>
+      <a href="/fallakten?id=${result.case_file_id}" class="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">${t('analysis.open_case')}</a>
+    `;
+  }
+
+  document.getElementById('result-section').scrollIntoView({ behavior: 'smooth' });
+}
+
+/**
+ * Build the GDT response file client-side from the analysis result and
+ * expose it as a Blob download. GDT 2.1 requires ISO 8859-1, so the string
+ * is explicitly encoded to Latin-1 bytes (non-mappable chars become '?').
+ */
+function offerGDTExport(result) {
+  const link = document.getElementById('gdt-download-link');
+  if (!result || !result.gop_results?.length) {
+    link.classList.add('hidden');
+    link.classList.remove('inline-flex');
+    return;
+  }
+  const gdtText = buildGDTClientside(result);
+  const latin1 = Uint8Array.from([...gdtText].map(ch => {
+    const code = ch.charCodeAt(0);
+    return code <= 0xFF ? code : 0x3F; // '?'
+  }));
+  const blob = new Blob([latin1], { type: 'application/x-gdt' });
+  link.href = URL.createObjectURL(blob);
+  link.download = `ebm_export_${result.treatment_date || 'export'}.gdt`;
+  link.classList.remove('hidden');
+  link.classList.add('inline-flex');
+}
+
+function buildGDTClientside(result) {
+  // Minimal GDT 2.1 response record (Satzart 8220).
+  // Line format: LLL FFFF content CRLF, where LLL is total line length.
+  const gops = result.gop_results || [];
+  const date = (result.treatment_date || new Date().toISOString().slice(0,10)).replace(/-/g,'');
+  const gdtDate = date.length === 8 ? date.slice(6)+date.slice(4,6)+date.slice(0,4) : date;
+
+  const line = (fk, val) => {
+    const content = String(val);
+    const total = String(3 + 4 + content.length + 2).padStart(3,'0');
+    return total + fk + content + '\r\n';
+  };
+
+  let out = '';
+  out += line('8000', '8220');
+  out += line('9218', 'GDT02.10');
+  out += line('6200', gdtDate);
+  out += line('6205', '=== EBM-Kodierung (KI-validiert, EBM Analyzer) ===');
+  for (const g of gops) {
+    const desc = (g.description || '').slice(0,60).split('.')[0];
+    out += line('6205', `GOP ${g.gop_code}  ${desc}  (${Math.round((g.confidence||0)*100)}%)`);
+  }
+  out += line('6205', `Erstellt: ${new Date().toLocaleString('de-DE')} | EBM Analyzer`);
+  return out;
+}
+
+async function toggleGOPStatus(gopCode, caseFileId) {
+  if (!caseFileId || currentMode === 'instant') return;
+  // Placeholder: full HITL toggling lives on the case detail page
+  console.log('GOP status toggle for', gopCode, 'in case file', caseFileId);
+}
+
+document.getElementById('report-text').addEventListener('input', function() {
+  document.getElementById('char-count').textContent = t('analysis.chars', { count: this.value.length });
+});
+
+function loadSampleText() {
+  // Sample stays German regardless of UI locale: the analysis pipeline and
+  // its prompt are built for German clinical reports.
+  document.getElementById('report-text').value = `Arztbrief – Allgemeinmedizin
+
+Patient: [anonymisiert], geb. [anonymisiert]
+Behandlungsdatum: ${new Date().toISOString().split('T')[0]}
+
+Anamnese:
+Der Patient stellt sich zur unvorhergesehenen Inanspruchnahme außerhalb der Sprechstunde vor.
+Er klagt über seit gestern Abend bestehende stechende Thoraxschmerzen und Dyspnoe.
+
+Körperliche Untersuchung:
+Vollständige körperliche Untersuchung inkl. Auskultation und Perkussion.
+RR 145/90 mmHg, HF 88/min, Temp. 37,4°C, SpO2 97%.
+
+Diagnose:
+V.a. muskuläre Genese der Thoraxschmerzen bei vorbekanntem Hypertonus.
+ICD-10: R07.3, I10
+
+Therapie:
+Verordnung von Ibuprofen 400mg, Antihypertensivum weitergeführt.
+EKG-Kontrolle durchgeführt – unauffällig.
+
+Maßnahmen:
+- EKG-Auswertung
+- Blutdruckmessung
+- Ausführliches Beratungsgespräch zur Verhaltensmodifikation (ca. 15 Min.)
+
+Der Patient wird gebeten, sich bei anhaltenden oder zunehmenden Beschwerden umgehend vorzustellen.`;
+  document.getElementById('char-count').textContent = t('analysis.chars', { count: document.getElementById('report-text').value.length });
+}
+
+function showError(msg) {
+  const banner = document.getElementById('error-banner');
+  document.getElementById('error-text').textContent = msg;
+  banner.classList.remove('hidden');
+  banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// Init: apply mode from URL after translations are ready (setMode uses t())
+document.addEventListener('DOMContentLoaded', async () => {
+  await I18N.ready;
+  setMode(currentMode);
+});
+</script>
+{% endblock %}

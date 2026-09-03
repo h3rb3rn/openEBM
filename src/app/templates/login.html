@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Anmelden – EBM Analyzer</title>
+  <link rel="stylesheet" href="/static/css/tailwind.css">
+
+  <!-- PWA: same manifest as the app shell so the install prompt is available from login too -->
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="icon" href="/static/favicon.ico">
+  <link rel="apple-touch-icon" href="/static/icons/apple-touch-icon.png">
+  <meta name="theme-color" content="#0ea5e9">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="EBM Analyzer">
+
+  <script src="/static/js/i18n.js"></script>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center p-4">
+
+<div class="w-full max-w-sm">
+  <!-- Logo -->
+  <div class="text-center mb-8">
+    <div class="w-16 h-16 bg-sky-500 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg">
+      <span class="text-white text-3xl font-bold">E</span>
+    </div>
+    <h1 class="text-2xl font-bold text-white">EBM Analyzer</h1>
+    <p class="text-slate-400 text-sm mt-1" data-i18n="login.tagline">Sovereign AI Stack · DSGVO-konform</p>
+  </div>
+
+  <!-- Login form -->
+  <div class="bg-white rounded-2xl shadow-xl p-8">
+    <div class="flex items-center justify-between mb-6">
+      <h2 class="text-lg font-semibold text-gray-800" data-i18n="login.heading">Anmelden</h2>
+      <select id="locale-picker"
+        class="text-xs border border-gray-200 rounded-lg px-2 py-1 text-gray-600 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer">
+        <option value="de">🇩🇪 Deutsch</option>
+        <option value="en">🇬🇧 English</option>
+      </select>
+    </div>
+
+    <div id="error-msg" class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700"></div>
+    <div id="success-msg" class="hidden mb-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg text-sm text-emerald-700"></div>
+
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="login.email">E-Mail</label>
+        <input type="email" id="email" name="email" required
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <div>
+        <div class="flex items-center justify-between mb-1.5">
+          <label class="block text-sm font-medium text-gray-700" data-i18n="login.password">Passwort</label>
+          <button type="button" id="forgot-link" class="text-xs text-sky-600 hover:text-sky-700" data-i18n="login.forgot_password">Passwort vergessen?</button>
+        </div>
+        <input type="password" id="password" name="password" required
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <button type="submit" id="login-btn"
+        class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg transition-colors text-sm"
+        data-i18n="login.submit">
+        Anmelden
+      </button>
+    </form>
+
+    <form id="forgot-form" class="hidden space-y-4">
+      <p class="text-sm text-gray-600" data-i18n="login.forgot_hint">Geben Sie Ihre E-Mail-Adresse ein. Falls ein Konto existiert, erhalten Sie einen Link zum Zurücksetzen.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="login.email">E-Mail</label>
+        <input type="email" id="forgot-email" required
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <button type="submit" id="forgot-btn"
+        class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg transition-colors text-sm"
+        data-i18n="login.forgot_submit">
+        Link anfordern
+      </button>
+      <button type="button" id="forgot-back" class="w-full text-center text-xs text-gray-500 hover:text-gray-700" data-i18n="login.back_to_login">Zurück zur Anmeldung</button>
+    </form>
+
+    <form id="reset-confirm-form" class="hidden space-y-4">
+      <p class="text-sm text-gray-600" data-i18n="login.reset_hint">Bitte neues Passwort festlegen.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="login.new_password">Neues Passwort</label>
+        <input type="password" id="reset-password" required minlength="8"
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm">
+      </div>
+      <button type="submit" id="reset-confirm-btn"
+        class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg transition-colors text-sm"
+        data-i18n="login.reset_submit">
+        Passwort setzen
+      </button>
+    </form>
+
+    <form id="twofa-form" class="hidden space-y-4">
+      <p class="text-sm text-gray-600" data-i18n="login.twofa_hint">Bitte den 6-stelligen Code aus Ihrer Authenticator-App eingeben (oder einen Backup-Code).</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="login.twofa_code">Code</label>
+        <input type="text" id="twofa-code" name="code" required autocomplete="one-time-code" inputmode="numeric"
+          class="w-full px-3.5 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm tracking-widest text-center">
+      </div>
+      <button type="submit" id="twofa-btn"
+        class="w-full py-2.5 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg transition-colors text-sm"
+        data-i18n="login.twofa_submit">
+        Bestätigen
+      </button>
+    </form>
+  </div>
+
+  <p class="text-center text-xs text-slate-500 mt-6" data-i18n="login.footer_note">
+    Alle Daten verbleiben lokal · Air-Gap-fähig
+  </p>
+</div>
+
+<script>
+let pendingToken = null;
+
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const btn = document.getElementById('login-btn');
+  const errMsg = document.getElementById('error-msg');
+  btn.disabled = true;
+  btn.textContent = t('login.submitting');
+  errMsg.classList.add('hidden');
+
+  const formData = new FormData();
+  formData.append('username', document.getElementById('email').value);
+  formData.append('password', document.getElementById('password').value);
+
+  try {
+    // credentials: 'same-origin' ensures the httpOnly session cookie set by
+    // the server (Set-Cookie: ebm_session) is stored — there is no token to
+    // handle in JavaScript.
+    const resp = await fetch('/api/auth/token', {
+      method: 'POST',
+      body: formData,
+      credentials: 'same-origin',
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      errMsg.textContent = data.detail || t('login.failed');
+      errMsg.classList.remove('hidden');
+      return;
+    }
+    if (data.requires_2fa) {
+      pendingToken = data.pending_token;
+      document.getElementById('login-form').classList.add('hidden');
+      document.getElementById('twofa-form').classList.remove('hidden');
+      document.getElementById('twofa-code').focus();
+      return;
+    }
+    window.location.href = '/dashboard';
+  } catch (err) {
+    errMsg.textContent = t('login.network_error');
+    errMsg.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('login.submit');
+  }
+});
+
+document.getElementById('twofa-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const btn = document.getElementById('twofa-btn');
+  const errMsg = document.getElementById('error-msg');
+  btn.disabled = true;
+  btn.textContent = t('login.submitting');
+  errMsg.classList.add('hidden');
+
+  try {
+    const resp = await fetch('/api/auth/2fa/verify', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pending_token: pendingToken, code: document.getElementById('twofa-code').value }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      errMsg.textContent = data.detail || t('login.failed');
+      errMsg.classList.remove('hidden');
+      return;
+    }
+    window.location.href = '/dashboard';
+  } catch (err) {
+    errMsg.textContent = t('login.network_error');
+    errMsg.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('login.twofa_submit');
+  }
+});
+
+// ─── Forgot password / reset flow ──────────────────────────────────────
+function showView(id) {
+  ['login-form', 'twofa-form', 'forgot-form', 'reset-confirm-form'].forEach(formId => {
+    document.getElementById(formId).classList.toggle('hidden', formId !== id);
+  });
+  document.getElementById('error-msg').classList.add('hidden');
+  document.getElementById('success-msg').classList.add('hidden');
+}
+
+document.getElementById('forgot-link').addEventListener('click', () => showView('forgot-form'));
+document.getElementById('forgot-back').addEventListener('click', () => showView('login-form'));
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const btn = document.getElementById('forgot-btn');
+  const errMsg = document.getElementById('error-msg');
+  const okMsg = document.getElementById('success-msg');
+  btn.disabled = true;
+  errMsg.classList.add('hidden');
+  okMsg.classList.add('hidden');
+
+  try {
+    const resp = await fetch('/api/auth/password-reset/request', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: document.getElementById('forgot-email').value }),
+    });
+    const data = await resp.json();
+    okMsg.textContent = data.message || t('login.forgot_sent');
+    okMsg.classList.remove('hidden');
+  } catch (err) {
+    errMsg.textContent = t('login.network_error');
+    errMsg.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('reset-confirm-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  await I18N.ready;
+  const btn = document.getElementById('reset-confirm-btn');
+  const errMsg = document.getElementById('error-msg');
+  const okMsg = document.getElementById('success-msg');
+  btn.disabled = true;
+  errMsg.classList.add('hidden');
+  okMsg.classList.add('hidden');
+
+  const token = new URLSearchParams(window.location.search).get('reset_token');
+  try {
+    const resp = await fetch('/api/auth/password-reset/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, new_password: document.getElementById('reset-password').value }),
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      errMsg.textContent = data.detail || t('login.failed');
+      errMsg.classList.remove('hidden');
+      return;
+    }
+    okMsg.textContent = data.message || t('login.reset_done');
+    okMsg.classList.remove('hidden');
+    document.getElementById('reset-confirm-form').classList.add('hidden');
+    window.history.replaceState({}, '', '/login');
+  } catch (err) {
+    errMsg.textContent = t('login.network_error');
+    errMsg.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// If the page was opened from a reset-link email, show the confirm view
+// directly instead of the login form.
+if (new URLSearchParams(window.location.search).get('reset_token')) {
+  showView('reset-confirm-form');
+}
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js').catch(() => { /* non-critical */ });
+  });
+}
+</script>
+</body>
+</html>

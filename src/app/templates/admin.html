@@ -1,0 +1,1389 @@
+{% extends "base.html" %}
+{% set active_page = "admin" %}
+{% block title %}Administration – EBM Analyzer{% endblock %}
+
+{% block content %}
+<div class="p-6 max-w-7xl mx-auto space-y-6">
+
+  <!-- Header -->
+  <div class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-gray-900" data-i18n="admin.title">Administration</h1>
+      <p class="text-sm text-gray-500 mt-0.5" data-i18n="admin.subtitle">Benutzerverwaltung · System-Monitoring · Datenquellen</p>
+    </div>
+    <button id="refresh-btn" onclick="loadAll()"
+      class="flex items-center gap-2 px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+      <span data-i18n="admin.refresh">Aktualisieren</span>
+    </button>
+  </div>
+
+  <!-- Tabs -->
+  <div class="border-b border-gray-200">
+    <nav class="flex gap-6" id="admin-tabs">
+      <button onclick="showTab('users')"   data-tab="users"   class="tab-btn pb-3 text-sm font-medium border-b-2 border-sky-500 text-sky-600" data-i18n="admin.tab_users">Benutzer</button>
+      <button onclick="showTab('system')"  data-tab="system"  class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_system">System &amp; Monitoring</button>
+      <button onclick="showTab('sources')" data-tab="sources" class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_sources">Datenquellen</button>
+      <button onclick="showTab('metrics')" data-tab="metrics" class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_metrics">Metriken</button>
+      <button onclick="showTab('import')"  data-tab="import"  class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_import">Import</button>
+      <button onclick="showTab('interop')" data-tab="interop" class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_interop">Interop</button>
+      <button onclick="showTab('apikeys')" data-tab="apikeys" class="tab-btn pb-3 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700" data-i18n="admin.tab_apikeys">API-Zugriff</button>
+    </nav>
+  </div>
+
+  <!-- ═══════════════════ TAB: USERS ═══════════════════ -->
+  <div id="tab-users" class="space-y-4">
+
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.users_heading">Benutzerverwaltung</h2>
+      <button onclick="openCreateModal()"
+        class="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700"
+        data-i18n="admin.new_user">
+        + Neuer Benutzer
+      </button>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div id="users-table">
+        <div class="flex items-center justify-center py-10"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: SYSTEM ═══════════════════ -->
+  <div id="tab-system" class="hidden space-y-4">
+
+    <h2 class="font-semibold text-gray-800" data-i18n="admin.system_heading">System-Status &amp; Monitoring</h2>
+
+    <!-- Service cards -->
+    <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3" id="service-cards">
+      <div class="flex items-center justify-center py-8 col-span-5"><div class="spinner"></div></div>
+    </div>
+
+    <!-- LLM configuration -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+        <span data-i18n="admin.llm_heading">KI-Anbindung (LLM)</span>
+      </h3>
+      <div id="llm-config" class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div class="flex items-center justify-center py-4 col-span-4"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- MCP tools -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+        <span data-i18n="admin.mcp_heading">MCP Deterministische Validierungs-Tools</span>
+      </h3>
+      <div id="mcp-tools" class="space-y-2 text-sm">
+        <div class="flex items-center justify-center py-4"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: DATA SOURCES ═══════════════════ -->
+  <div id="tab-sources" class="hidden space-y-4">
+
+    <h2 class="font-semibold text-gray-800" data-i18n="admin.sources_heading">Datenquellen &amp; Datenbankstatus</h2>
+
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="datasource-cards">
+      <div class="flex items-center justify-center py-8 col-span-2"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: IMPORT ═══════════════════ -->
+  <div id="tab-import" class="hidden space-y-6">
+
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.import_heading">EBM-Katalog Import &amp; Pflege</h2>
+      <button onclick="loadImport()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span data-i18n="admin.load_status">Status laden</span>
+      </button>
+    </div>
+
+    <!-- Catalog file -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+        <span data-i18n="admin.catalog_file">Katalog-Datei</span>
+      </h3>
+      <div id="import-catalog-info">
+        <div class="flex items-center justify-center py-6"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Database status -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582 4 8 4s8 1.79 8 4"/></svg>
+        <span data-i18n="admin.db_status">Datenbankstatus</span>
+      </h3>
+      <div id="import-db-stats" class="grid grid-cols-3 gap-4">
+        <div class="flex items-center justify-center py-6 col-span-3"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- KBV PDF import: configurable source + preview-before-commit -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <svg class="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <span data-i18n="admin.kbv_import_heading">KBV-Katalog-Import (PDF)</span>
+      </h3>
+      <p class="text-sm text-gray-500 mb-4" data-i18n="admin.kbv_import_desc">
+        Lädt die quartalsweise KBV-PDF von der unten konfigurierten Adresse und liest GOP-Ziffern, Punktwerte, Ausschlüsse und Altersgrenzen heraus. Da es sich um eine heuristische Texterkennung gegen ein unstrukturiertes Dokument handelt, wird nichts automatisch in die Datenbank geschrieben — erst nach Prüfung der Vorschau.
+      </p>
+
+      <label class="text-xs text-gray-500 mb-1 block" data-i18n="admin.kbv_source_url_label">Quell-URL (editierbar, pro Quartal anzupassen)</label>
+      <div class="flex gap-2 mb-4">
+        <input id="kbv-source-url" type="url" placeholder="https://www.kbv.de/documents/praxis/abrechnung/ebm/…-ebm.pdf"
+          class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:ring-2 focus:ring-sky-500 focus:outline-none">
+        <button onclick="saveKbvSource()" class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" data-i18n="common.save">Speichern</button>
+      </div>
+
+      <div id="kbv-import-status" class="hidden mb-4 p-3 rounded-lg text-sm border"></div>
+
+      <div id="kbv-import-progress" class="hidden mb-4">
+        <div class="flex items-center gap-3 text-sm text-sky-700">
+          <div class="spinner border-sky-600"></div>
+          <span id="kbv-import-progress-msg" data-i18n="admin.import_running">Import läuft…</span>
+        </div>
+      </div>
+
+      <!-- Preview panel (populated once fetch+parse finishes) -->
+      <div id="kbv-preview-panel" class="hidden mb-4 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3" id="kbv-preview-stats"></div>
+        <div id="kbv-preview-warnings" class="text-xs text-amber-800 mb-3"></div>
+        <div id="kbv-preview-sample" class="text-xs font-mono bg-white border border-amber-100 rounded-lg p-3 mb-3 max-h-48 overflow-y-auto"></div>
+        <div class="flex gap-3">
+          <button id="kbv-commit-btn" onclick="commitKbvImport()" class="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700" data-i18n="admin.kbv_commit_button">Prüfung abgeschlossen — übernehmen</button>
+          <button onclick="dismissKbvPreview()" class="px-4 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600" data-i18n="common.cancel">Abbrechen</button>
+        </div>
+      </div>
+
+      <button id="kbv-fetch-btn" onclick="fetchKbvImport()"
+        class="flex items-center gap-2 px-5 py-2.5 bg-violet-600 text-white text-sm font-medium rounded-lg hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span data-i18n="admin.kbv_fetch_button">Von KBV laden (Vorschau)</span>
+      </button>
+    </div>
+
+    <!-- Local-file import action (air-gapped path) -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+        <span data-i18n="admin.run_import">Lokale Katalog-Datei importieren</span>
+      </h3>
+      <p class="text-sm text-gray-500 mb-4" data-i18n="admin.import_desc">Liest die bereits abgelegte Katalog-Datei (z.B. für Air-Gap-Betrieb ohne Internetzugriff) und schreibt alle GOPs neu in Neo4j und ChromaDB. Laufzeit ca. 2–5 Minuten.</p>
+
+      <div id="import-run-status" class="hidden mb-4 p-3 rounded-lg text-sm border"></div>
+
+      <div id="import-progress" class="hidden mb-4">
+        <div class="flex items-center gap-3 text-sm text-sky-700">
+          <div class="spinner border-sky-600"></div>
+          <span id="import-progress-msg" data-i18n="admin.import_running">Import läuft…</span>
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button id="import-trigger-btn" onclick="triggerImport()"
+          class="flex items-center gap-2 px-5 py-2.5 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 disabled:opacity-50 disabled:cursor-not-allowed">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span data-i18n="admin.import_now">Jetzt importieren</span>
+        </button>
+        <button onclick="loadImport()"
+          class="px-4 py-2.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600"
+          data-i18n="admin.refresh_status">
+          Status aktualisieren
+        </button>
+      </div>
+    </div>
+
+    <!-- Known import sources -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4 flex items-center gap-2">
+        <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/></svg>
+        <span data-i18n="admin.known_sources">Bekannte Importquellen</span>
+      </h3>
+      <div class="space-y-3">
+        <div class="flex items-start gap-3 p-3 bg-gray-50 rounded-lg border border-gray-100">
+          <span class="mt-0.5 flex-shrink-0 w-5 h-5 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">2</span>
+          <div class="min-w-0">
+            <div class="text-sm font-medium text-gray-800" data-i18n="admin.seed_source_name">Seed-Daten (Demo/Testing)</div>
+            <div class="text-xs text-gray-500 mt-0.5" data-i18n="admin.seed_source_desc">Kuratierte Beispiel-GOPs für Entwicklung und Demo · 21 GOPs</div>
+            <div class="text-xs text-gray-400 mt-1 font-mono">src/ingestion/seed_data.py (Fallback)</div>
+          </div>
+          <span class="flex-shrink-0 px-2 py-0.5 text-xs rounded-full bg-gray-50 border border-gray-200 text-gray-500">Fallback</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════ TAB: INTEROP ═══════════════════ -->
+  <div id="tab-interop" class="hidden space-y-6">
+
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.interop_heading">Interoperabilität – PVS / EMR Integration</h2>
+      <button onclick="loadInterop()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 text-gray-600">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        <span data-i18n="admin.load_status">Status laden</span>
+      </button>
+    </div>
+
+    <div id="interop-status-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="flex items-center justify-center py-10 col-span-2"><div class="spinner"></div></div>
+    </div>
+
+    <!-- GDT upload test -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-1 flex items-center gap-2">
+        <svg class="w-4 h-4 text-sky-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+        <span data-i18n="admin.gdt_upload_heading">GDT-Datei hochladen &amp; analysieren</span>
+      </h3>
+      <p class="text-xs text-gray-400 mb-4" data-i18n="admin.gdt_upload_desc">GDT 2.1 kompatibel · ISO 8859-1 · Feldkennungen 6205/6220/6228 für klinische Texte · 3101–3119 für Patientenstamm</p>
+      <div class="flex gap-3 items-end">
+        <div class="flex-1">
+          <label class="text-xs text-gray-500 mb-1 block" data-i18n="admin.gdt_file_label">GDT-Datei auswählen (.gdt, .bdt)</label>
+          <input type="file" id="gdt-file-input" accept=".gdt,.bdt,.GDT,.BDT,text/plain"
+            class="w-full text-sm text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-sky-50 file:text-sky-600 hover:file:bg-sky-100">
+        </div>
+        <button onclick="uploadGDT()" id="gdt-upload-btn"
+          class="px-5 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 flex-shrink-0"
+          data-i18n="admin.analyze_button">
+          Analysieren
+        </button>
+      </div>
+      <div id="gdt-result" class="hidden mt-4"></div>
+    </div>
+
+    <!-- Endpoint quick reference -->
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4" data-i18n="admin.endpoint_reference">Schnellreferenz – Endpunkte</h3>
+      <div class="space-y-3 text-sm">
+        <div class="p-3 bg-gray-50 rounded-lg font-mono text-xs overflow-x-auto">
+          <span class="text-emerald-600 font-bold">POST</span> /api/interop/gdt/analyze
+          <span class="text-gray-400 ml-2">multipart/form-data · field: file (*.gdt)</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-lg font-mono text-xs overflow-x-auto">
+          <span class="text-sky-600 font-bold">GET</span> /api/interop/gdt/export/{'{'}session_id{'}'}
+          <span class="text-gray-400 ml-2">→ application/x-gdt Download</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-lg font-mono text-xs overflow-x-auto">
+          <span class="text-emerald-600 font-bold">POST</span> /api/interop/fhir/v4/$analyze-ebm
+          <span class="text-gray-400 ml-2">application/json · FHIR DocumentReference / Composition / Parameters</span>
+        </div>
+        <div class="p-3 bg-gray-50 rounded-lg font-mono text-xs overflow-x-auto">
+          <span class="text-violet-600 font-bold">MCP</span> analyze_clinical_text_for_ebm
+          <span class="text-gray-400 ml-2">SSE Transport · http://mcp-server:8001/sse</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ═══════════════════ TAB: API ACCESS ═══════════════════ -->
+  <div id="tab-apikeys" class="hidden space-y-6">
+
+    <div class="flex items-center justify-between">
+      <div>
+        <h2 class="font-semibold text-gray-800" data-i18n="admin.apikeys_heading">API-Zugriff für externe Programme</h2>
+        <p class="text-sm text-gray-500 mt-0.5" data-i18n="admin.apikeys_desc">Erstellen Sie API-Keys, damit CRM-Systeme, PVS oder andere Programme sich mit diesem Tool verbinden können.</p>
+      </div>
+      <button onclick="openCreateKeyModal()"
+        class="flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700 flex-shrink-0"
+        data-i18n="admin.new_apikey">
+        + Neuer API-Key
+      </button>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl overflow-hidden">
+      <div id="apikeys-table">
+        <div class="flex items-center justify-center py-10"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-3" data-i18n="admin.usage_heading">Verwendung</h3>
+      <p class="text-xs text-gray-500 mb-3" data-i18n="admin.usage_desc">Externe Programme authentifizieren sich per HTTP-Header anstelle eines Login-Tokens:</p>
+      <div class="p-3 bg-gray-50 rounded-lg font-mono text-xs overflow-x-auto">
+        curl -H "X-API-Key: ebm_live_..." https://your-domain/api/interop/status
+      </div>
+      <p class="text-xs text-gray-400 mt-3" data-i18n="admin.scopes_note">Jeder Key ist auf bestimmte Bereiche (Scopes) beschränkt: interop (GDT/FHIR), analysis (Instant-Analyse), patients (Patientenverwaltung), cases (Fallakten lesen).</p>
+    </div>
+  </div>
+
+  <!-- ═══════════════════ TAB: METRICS ═══════════════════ -->
+  <div id="tab-metrics" class="hidden space-y-4">
+
+    <h2 class="font-semibold text-gray-800" data-i18n="admin.metrics_heading">Mandanten-Metriken</h2>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="metric-cards">
+      <div class="flex items-center justify-center py-8 col-span-4"><div class="spinner"></div></div>
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <h3 class="font-semibold text-gray-700 mb-4" data-i18n="admin.roles_heading">Rollen-Verteilung</h3>
+      <div id="role-chart" class="space-y-2"></div>
+    </div>
+
+    <!-- Suggestion quality: derived read-only from existing accept/reject/MCP-flag
+         history — no model change, see admin.py suggestion_quality_metrics(). -->
+    <h2 class="font-semibold text-gray-800 pt-2" data-i18n="admin.quality_heading">Vorschlagsqualität</h2>
+
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4" id="quality-cards">
+      <div class="flex items-center justify-center py-8 col-span-3"><div class="spinner"></div></div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold text-gray-700 mb-1" data-i18n="admin.quality_by_quarter">Annahmequote je Quartal</h3>
+        <p class="text-xs text-gray-400 mb-4" data-i18n="admin.quality_by_quarter_hint">Katalog ändert sich quartalsweise — Vergleich über Quartale hinweg nur als Trend lesen.</p>
+        <div id="quality-quarter-chart" class="space-y-2"></div>
+      </div>
+
+      <div class="bg-white border border-gray-200 rounded-xl p-5">
+        <h3 class="font-semibold text-gray-700 mb-1" data-i18n="admin.quality_top_gops">Meistvorgeschlagene GOPs</h3>
+        <p class="text-xs text-gray-400 mb-4" data-i18n="admin.quality_top_gops_hint">Niedrige Annahmequote kann auf einen Prompt- oder RAG-Schwachpunkt für diese Ziffer hindeuten.</p>
+        <div id="quality-gop-table" class="overflow-x-auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ Modal: create user ═════════════════════════════════════════ -->
+<div id="modal-create" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.create_user_title">Neuen Benutzer anlegen</h2>
+      <button onclick="closeModal('modal-create')" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+    <form id="create-form" class="p-6 space-y-4" onsubmit="submitCreate(event)">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.full_name">Vollständiger Name</label>
+        <input name="full_name" required class="field" placeholder="Dr. Max Mustermann">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.email_label">E-Mail-Adresse</label>
+        <input name="email" type="email" required class="field" placeholder="arzt@praxis.de">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="login.password">Passwort</label>
+        <input name="password" type="password" required minlength="8" class="field"
+          placeholder="Mindestens 8 Zeichen" data-i18n-placeholder="admin.password_placeholder">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.role_label">Rolle</label>
+        <select name="role" class="field">
+          <option value="arzt" data-i18n="role.arzt">Arzt</option>
+          <option value="mfa" data-i18n="role.mfa">MFA</option>
+          <option value="readonly" data-i18n="role.readonly">Nur Lesen</option>
+          <option value="admin" data-i18n="role.admin">Administrator</option>
+        </select>
+      </div>
+      <div id="create-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+      <div class="flex gap-3 pt-1">
+        <button type="submit" class="flex-1 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 text-sm" data-i18n="admin.create_button">Anlegen</button>
+        <button type="button" onclick="closeModal('modal-create')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50" data-i18n="common.cancel">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ Modal: edit user ═══════════════════════════════════════════ -->
+<div id="modal-edit" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.edit_user_title">Benutzer bearbeiten</h2>
+      <button onclick="closeModal('modal-edit')" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+    <form id="edit-form" class="p-6 space-y-4" onsubmit="submitEdit(event)">
+      <input type="hidden" id="edit-user-id">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.full_name">Vollständiger Name</label>
+        <input id="edit-full-name" name="full_name" required class="field">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.role_label">Rolle</label>
+        <select id="edit-role" name="role" class="field">
+          <option value="arzt" data-i18n="role.arzt">Arzt</option>
+          <option value="mfa" data-i18n="role.mfa">MFA</option>
+          <option value="readonly" data-i18n="role.readonly">Nur Lesen</option>
+          <option value="admin" data-i18n="role.admin">Administrator</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.new_password_label">Neues Passwort (leer lassen = unverändert)</label>
+        <input id="edit-password" name="new_password" type="password" minlength="8" class="field"
+          placeholder="Leer lassen für keine Änderung" data-i18n-placeholder="admin.new_password_placeholder">
+      </div>
+      <div id="edit-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+      <div class="flex gap-3 pt-1">
+        <button type="submit" class="flex-1 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 text-sm" data-i18n="common.save">Speichern</button>
+        <button type="button" onclick="closeModal('modal-edit')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50" data-i18n="common.cancel">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ Modal: create API key ══════════════════════════════════════ -->
+<div id="modal-create-key" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.create_key_title">Neuen API-Key erstellen</h2>
+      <button onclick="closeModal('modal-create-key')" class="text-gray-400 hover:text-gray-600">✕</button>
+    </div>
+    <form id="create-key-form" class="p-6 space-y-4" onsubmit="submitCreateKey(event)">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.key_name_label">Name / Zweck</label>
+        <input name="name" required class="field" placeholder="z.B. CRM-Anbindung Praxis-Software" data-i18n-placeholder="admin.key_name_placeholder">
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.scopes_label">Berechtigungen (Scopes)</label>
+        <div class="space-y-2">
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="scope" value="interop" checked class="rounded border-gray-300">
+            <span>Interop <span class="text-gray-400">(GDT/BDT + FHIR)</span></span>
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="scope" value="analysis" checked class="rounded border-gray-300">
+            <span>Analysis <span class="text-gray-400" data-i18n="admin.scope_analysis_hint">(Instant-Analyse)</span></span>
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="scope" value="patients" class="rounded border-gray-300">
+            <span>Patients <span class="text-gray-400" data-i18n="admin.scope_patients_hint">(Patientenverwaltung)</span></span>
+          </label>
+          <label class="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="scope" value="cases" class="rounded border-gray-300">
+            <span>Cases <span class="text-gray-400" data-i18n="admin.scope_cases_hint">(Fallakten lesen)</span></span>
+          </label>
+        </div>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5" data-i18n="admin.expiry_label">Ablauf</label>
+        <select name="expires_in_days" class="field">
+          <option value="" data-i18n="admin.no_expiry">Kein Ablauf</option>
+          <option value="30" data-i18n="admin.days_30">30 Tage</option>
+          <option value="90" data-i18n="admin.days_90">90 Tage</option>
+          <option value="365" data-i18n="admin.one_year">1 Jahr</option>
+        </select>
+      </div>
+      <div id="create-key-error" class="hidden text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3"></div>
+      <div class="flex gap-3 pt-1">
+        <button type="submit" class="flex-1 py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 text-sm" data-i18n="admin.create_key_button">Erstellen</button>
+        <button type="button" onclick="closeModal('modal-create-key')" class="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm hover:bg-gray-50" data-i18n="common.cancel">Abbrechen</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- ═══ Modal: show API key (one-time) ═════════════════════════════ -->
+<div id="modal-show-key" class="hidden fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
+    <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <h2 class="font-semibold text-gray-800" data-i18n="admin.key_created_title">API-Key erstellt</h2>
+    </div>
+    <div class="p-6 space-y-4">
+      <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800" data-i18n="admin.key_created_warning">
+        Dieser Schlüssel wird nur einmal angezeigt. Bitte jetzt sicher speichern — er kann später nicht erneut abgerufen werden.
+      </div>
+      <div class="relative">
+        <input id="show-key-value" readonly
+          class="w-full px-3.5 py-2.5 pr-20 border border-gray-200 rounded-lg text-sm font-mono bg-gray-50">
+        <button onclick="copyKeyValue()"
+          class="absolute right-1.5 top-1.5 px-2.5 py-1 bg-sky-600 text-white text-xs rounded-md hover:bg-sky-700" data-i18n="common.copy">Kopieren</button>
+      </div>
+      <button onclick="closeModal('modal-show-key'); loadApiKeys();"
+        class="w-full py-2.5 bg-sky-600 text-white font-semibold rounded-lg hover:bg-sky-700 text-sm" data-i18n="admin.key_understood">
+        Verstanden, schließen
+      </button>
+    </div>
+  </div>
+</div>
+
+<style>
+.field { @apply w-full px-3.5 py-2.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none; }
+.tab-btn { transition: all 0.15s; }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ─── Tab logic ───────────────────────────────────────────────────────
+function showTab(name) {
+  ['users','system','sources','metrics','import','interop','apikeys'].forEach(tab => {
+    document.getElementById('tab-' + tab).classList.toggle('hidden', tab !== name);
+  });
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    const active = btn.dataset.tab === name;
+    btn.className = 'tab-btn pb-3 text-sm font-medium border-b-2 ' +
+      (active ? 'border-sky-500 text-sky-600' : 'border-transparent text-gray-500 hover:text-gray-700');
+  });
+  if (name === 'system')  loadSystem();
+  if (name === 'sources') loadSources();
+  if (name === 'metrics') loadMetrics();
+  if (name === 'import')  loadImport();
+  if (name === 'interop') loadInterop();
+  if (name === 'apikeys') loadApiKeys();
+}
+
+// ─── Reload data for the active tab ──────────────────────────────────
+async function loadAll() {
+  loadUsers();
+  const activeTab = document.querySelector('.tab-btn[class*="sky-600"]')?.dataset.tab || 'users';
+  if (activeTab === 'system')  loadSystem();
+  if (activeTab === 'sources') loadSources();
+  if (activeTab === 'metrics') loadMetrics();
+  if (activeTab === 'import')  loadImport();
+  if (activeTab === 'interop') loadInterop();
+  if (activeTab === 'apikeys') loadApiKeys();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// USERS
+// ════════════════════════════════════════════════════════════════════
+const roleLabel = role => t('role.' + role);
+const ROLE_COLORS = {
+  admin:    'bg-violet-50 border-violet-200 text-violet-700',
+  arzt:     'bg-blue-50   border-blue-200   text-blue-700',
+  mfa:      'bg-sky-50    border-sky-200    text-sky-700',
+  readonly: 'bg-gray-50   border-gray-200   text-gray-600',
+};
+
+async function loadUsers() {
+  const resp = await apiCall('GET', '/admin/users');
+  if (!resp || !resp.ok) { document.getElementById('users-table').innerHTML = `<p class="p-5 text-sm text-red-500">${t('admin.no_access_error')}</p>`; return; }
+  const users = await resp.json();
+  const me = JSON.parse(localStorage.getItem('ebm_user') || '{}');
+
+  if (!users.length) {
+    document.getElementById('users-table').innerHTML = `<p class="p-6 text-sm text-gray-400 text-center">${t('admin.no_users')}</p>`;
+    return;
+  }
+
+  document.getElementById('users-table').innerHTML = `
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+        <th class="px-5 py-3 font-medium">${t('common.name')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_email')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.role_label')}</th>
+        <th class="px-4 py-3 font-medium">${t('common.status')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_last_login')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_created')}</th>
+        <th class="px-4 py-3 font-medium"></th>
+      </tr></thead>
+      <tbody>
+        ${users.map(u => `
+          <tr class="border-b border-gray-50 hover:bg-gray-50 ${!u.is_active ? 'opacity-50' : ''}">
+            <td class="px-5 py-3 font-medium">
+              <div class="flex items-center gap-2.5">
+                <div class="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white"
+                  style="background:${strColor(u.full_name)}">${u.full_name.charAt(0)}</div>
+                <span>${u.full_name}</span>
+                ${u.id === me.id ? `<span class="text-xs text-gray-400">(${t('admin.you')})</span>` : ''}
+              </div>
+            </td>
+            <td class="px-4 py-3 text-gray-600">${u.email}</td>
+            <td class="px-4 py-3">
+              <span class="px-2 py-0.5 rounded text-xs font-medium border ${ROLE_COLORS[u.role] || ''}">
+                ${roleLabel(u.role)}
+              </span>
+            </td>
+            <td class="px-4 py-3">
+              <span class="flex items-center gap-1.5 text-xs">
+                <div class="w-1.5 h-1.5 rounded-full ${u.is_active ? 'bg-green-400' : 'bg-gray-300'}"></div>
+                ${u.is_active ? t('common.active') : t('admin.deactivated')}
+              </span>
+            </td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${u.last_login || '–'}</td>
+            <td class="px-4 py-3 text-gray-400 text-xs">${u.created_at}</td>
+            <td class="px-4 py-3">
+              <div class="flex items-center gap-2">
+                <button onclick='openEditModal(${JSON.stringify(u)})'
+                  class="text-xs text-sky-600 hover:text-sky-700 font-medium">${t('common.edit')}</button>
+                <button onclick="toggleActive('${u.id}', ${u.is_active})"
+                  class="text-xs ${u.is_active ? 'text-orange-500 hover:text-orange-600' : 'text-green-600 hover:text-green-700'} font-medium">
+                  ${u.is_active ? t('admin.deactivate') : t('admin.activate')}
+                </button>
+                ${u.id !== me.id ? `<button onclick="deleteUser('${u.id}', '${u.full_name}')"
+                  class="text-xs text-red-500 hover:text-red-600 font-medium">${t('common.delete')}</button>` : ''}
+              </div>
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+function strColor(str) {
+  let h = 0;
+  for (let i = 0; i < str.length; i++) h = str.charCodeAt(i) + ((h << 5) - h);
+  return `hsl(${h % 360},55%,48%)`;
+}
+
+function openCreateModal() {
+  document.getElementById('create-form').reset();
+  document.getElementById('create-error').classList.add('hidden');
+  document.getElementById('modal-create').classList.remove('hidden');
+}
+
+function openEditModal(user) {
+  document.getElementById('edit-user-id').value = user.id;
+  document.getElementById('edit-full-name').value = user.full_name;
+  document.getElementById('edit-role').value = user.role;
+  document.getElementById('edit-password').value = '';
+  document.getElementById('edit-error').classList.add('hidden');
+  document.getElementById('modal-edit').classList.remove('hidden');
+}
+
+function closeModal(id) { document.getElementById(id).classList.add('hidden'); }
+
+async function submitCreate(e) {
+  e.preventDefault();
+  const form = e.target;
+  const data = Object.fromEntries(new FormData(form));
+  const errEl = document.getElementById('create-error');
+  const resp = await apiCall('POST', '/admin/users', data);
+  if (resp && resp.ok) {
+    closeModal('modal-create');
+    loadUsers();
+  } else {
+    const err = await resp.json();
+    errEl.textContent = err.detail || t('admin.create_failed');
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function submitEdit(e) {
+  e.preventDefault();
+  const userId = document.getElementById('edit-user-id').value;
+  const errEl  = document.getElementById('edit-error');
+  const data = {
+    full_name:    document.getElementById('edit-full-name').value,
+    role:         document.getElementById('edit-role').value,
+    new_password: document.getElementById('edit-password').value || null,
+  };
+  const resp = await apiCall('PATCH', `/admin/users/${userId}`, data);
+  if (resp && resp.ok) {
+    closeModal('modal-edit');
+    loadUsers();
+  } else {
+    const err = await resp.json();
+    errEl.textContent = err.detail || t('admin.save_failed');
+    errEl.classList.remove('hidden');
+  }
+}
+
+async function toggleActive(userId, currentlyActive) {
+  const resp = await apiCall('PATCH', `/admin/users/${userId}`, { is_active: !currentlyActive });
+  if (resp && resp.ok) loadUsers();
+}
+
+async function deleteUser(userId, name) {
+  if (!confirm(t('admin.confirm_delete_user', { name }))) return;
+  const resp = await apiCall('DELETE', `/admin/users/${userId}`);
+  if (resp && resp.status === 204) { loadUsers(); return; }
+  const err = resp ? await resp.json().catch(() => ({})) : {};
+  alert(err.detail || t('admin.delete_failed'));
+}
+
+// ════════════════════════════════════════════════════════════════════
+// SYSTEM & MONITORING
+// ════════════════════════════════════════════════════════════════════
+async function loadSystem() {
+  const resp = await apiCall('GET', '/system/status');
+  const data = resp && resp.ok ? await resp.json() : { services: {} };
+  const services = data.services || {};
+
+  const icons = {
+    postgres:   { icon: '🐘', label: 'PostgreSQL', desc: t('admin.svc_postgres') },
+    valkey:     { icon: '⚡', label: 'Valkey',     desc: t('admin.svc_valkey') },
+    chromadb:   { icon: '🔍', label: 'ChromaDB',   desc: t('admin.svc_chromadb') },
+    mcp_server: { icon: '🛡️', label: 'MCP Server', desc: t('admin.svc_mcp') },
+  };
+
+  document.getElementById('service-cards').innerHTML = Object.entries(services).map(([key, status]) => {
+    const ok = status === 'ok';
+    const meta = icons[key] || { icon: '⚙️', label: key, desc: '' };
+    return `
+      <div class="bg-white border ${ok ? 'border-green-200' : 'border-red-200'} rounded-xl p-4">
+        <div class="flex items-start justify-between mb-3">
+          <span class="text-2xl">${meta.icon}</span>
+          <div class="flex items-center gap-1.5 text-xs font-medium ${ok ? 'text-green-600' : 'text-red-600'}">
+            <div class="w-1.5 h-1.5 rounded-full ${ok ? 'bg-green-400' : 'bg-red-400'}"></div>
+            ${ok ? t('common.online') : t('common.error')}
+          </div>
+        </div>
+        <div class="font-semibold text-gray-800 text-sm">${meta.label}</div>
+        <div class="text-xs text-gray-400 mt-0.5">${meta.desc}</div>
+        ${!ok ? `<div class="mt-2 text-xs text-red-500">${status}</div>` : ''}
+      </div>
+    `;
+  }).join('');
+
+  // Neo4j is not part of /system/status; shown as a static card
+  document.getElementById('service-cards').innerHTML += `
+    <div class="bg-white border border-green-200 rounded-xl p-4">
+      <div class="flex items-start justify-between mb-3">
+        <span class="text-2xl">🔗</span>
+        <div class="flex items-center gap-1.5 text-xs font-medium text-green-600">
+          <div class="w-1.5 h-1.5 rounded-full bg-green-400"></div>${t('common.online')}
+        </div>
+      </div>
+      <div class="font-semibold text-gray-800 text-sm">Neo4j</div>
+      <div class="text-xs text-gray-400 mt-0.5">${t('admin.svc_neo4j')}</div>
+    </div>
+  `;
+
+  // LLM configuration summary
+  const llmConfig = [
+    { label: 'Provider',   value: 'Moe Sovereign API', icon: '🌐' },
+    { label: t('admin.llm_endpoint'),  value: 'api.moe-sovereign.org', icon: '🔗' },
+    { label: t('admin.llm_model'),     value: 'qwen3.6:35b@N04-RTX', icon: '🧠' },
+    { label: 'Transport',  value: t('admin.llm_transport_value'), icon: '🔒' },
+  ];
+  document.getElementById('llm-config').innerHTML = llmConfig.map(c => `
+    <div class="bg-gray-50 rounded-lg p-3">
+      <div class="text-xs text-gray-400 mb-1">${c.icon} ${c.label}</div>
+      <div class="font-medium text-gray-800 text-xs break-all">${c.value}</div>
+    </div>
+  `).join('') + `
+    <div class="col-span-full mt-1 flex items-start gap-2 p-3 bg-violet-50 border border-violet-100 rounded-lg text-xs text-violet-700">
+      <span>ℹ️</span>
+      <span>${t('admin.llm_note')}</span>
+    </div>
+  `;
+
+  // MCP validation tools
+  const tools = [
+    { name: 'ebm_validator_exclusions',  desc: t('admin.mcp_excl_desc'),  badge: 'Neo4j + Valkey' },
+    { name: 'ebm_validator_time_budget', desc: t('admin.mcp_time_desc'),  badge: 'Neo4j + KBV' },
+    { name: 'ebm_validator_demographics',desc: t('admin.mcp_demo_desc'),  badge: 'PostgreSQL + Neo4j' },
+    { name: 'analyze_clinical_text_for_ebm', desc: t('admin.mcp_analyze_desc'), badge: 'RAG + LLM + MCP' },
+  ];
+  document.getElementById('mcp-tools').innerHTML = tools.map(tool => `
+    <div class="flex items-start gap-3 p-3 bg-emerald-50 border border-emerald-100 rounded-lg">
+      <div class="w-2 h-2 rounded-full bg-emerald-400 mt-1.5 flex-shrink-0"></div>
+      <div>
+        <div class="font-mono text-xs font-bold text-emerald-800">${tool.name}</div>
+        <div class="text-xs text-gray-600 mt-0.5">${tool.desc}</div>
+        <div class="mt-1 text-xs text-emerald-600 font-medium">${tool.badge}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// DATA SOURCES
+// ════════════════════════════════════════════════════════════════════
+async function loadSources() {
+  // Descriptive catalog of every persistent data source in the stack
+  const sources = [
+    {
+      name: t('admin.src_ebm_name'),  icon: '📋', type: t('admin.src_ebm_type'),
+      desc: t('admin.src_ebm_desc'),
+      stores: ['Neo4j', 'ChromaDB'], update: t('admin.src_ebm_update'),
+      color: 'border-blue-200', badge: 'bg-blue-100 text-blue-700',
+    },
+    {
+      name: t('admin.src_patients_name'), icon: '👤', type: t('admin.src_patients_type'),
+      desc: t('admin.src_patients_desc'),
+      stores: ['PostgreSQL'], update: t('admin.src_patients_update'),
+      color: 'border-emerald-200', badge: 'bg-emerald-100 text-emerald-700',
+    },
+    {
+      name: t('admin.src_rules_name'), icon: '🚫', type: t('admin.src_rules_type'),
+      desc: t('admin.src_rules_desc'),
+      stores: ['Neo4j', 'Valkey (24h)'], update: t('admin.src_rules_update'),
+      color: 'border-red-200', badge: 'bg-red-100 text-red-700',
+    },
+    {
+      name: t('admin.src_embed_name'), icon: '🔍', type: t('admin.src_embed_type'),
+      desc: t('admin.src_embed_desc'),
+      stores: ['ChromaDB (HNSW, Cosine)'], update: t('admin.src_embed_update'),
+      color: 'border-violet-200', badge: 'bg-violet-100 text-violet-700',
+    },
+    {
+      name: t('admin.src_audit_name'), icon: '📝', type: 'Compliance',
+      desc: t('admin.src_audit_desc'),
+      stores: ['PostgreSQL (append-only)'], update: t('admin.src_audit_update'),
+      color: 'border-orange-200', badge: 'bg-orange-100 text-orange-700',
+    },
+    {
+      name: t('admin.src_sessions_name'), icon: '⚡', type: 'Transient',
+      desc: t('admin.src_sessions_desc'),
+      stores: ['Valkey (TTL)'], update: t('admin.src_sessions_update'),
+      color: 'border-sky-200', badge: 'bg-sky-100 text-sky-700',
+    },
+  ];
+
+  document.getElementById('datasource-cards').innerHTML = sources.map(s => `
+    <div class="bg-white border rounded-xl p-5 ${s.color}">
+      <div class="flex items-start gap-3 mb-3">
+        <span class="text-2xl">${s.icon}</span>
+        <div>
+          <div class="font-semibold text-gray-800">${s.name}</div>
+          <span class="text-xs px-2 py-0.5 rounded font-medium ${s.badge}">${s.type}</span>
+        </div>
+      </div>
+      <p class="text-sm text-gray-600 mb-3">${s.desc}</p>
+      <div class="space-y-1">
+        <div class="text-xs text-gray-500"><span class="font-medium">${t('admin.src_stores')}:</span> ${s.stores.join(', ')}</div>
+        <div class="text-xs text-gray-500"><span class="font-medium">${t('admin.src_update')}:</span> ${s.update}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ════════════════════════════════════════════════════════════════════
+// METRICS
+// ════════════════════════════════════════════════════════════════════
+async function loadMetrics() {
+  const resp = await apiCall('GET', '/admin/stats');
+  const stats = resp && resp.ok ? await resp.json() : {};
+
+  const cards = [
+    { label: t('admin.metric_users'),    value: stats.active_users  ?? '–', icon: '👥', color: 'text-sky-600' },
+    { label: t('admin.metric_patients'), value: stats.patients      ?? '–', icon: '👤', color: 'text-emerald-600' },
+    { label: t('admin.metric_cases'),    value: stats.case_files    ?? '–', icon: '📁', color: 'text-violet-600' },
+    { label: t('admin.metric_accepted'), value: stats.accepted_gops ?? '–', icon: '✓',  color: 'text-green-600' },
+  ];
+
+  document.getElementById('metric-cards').innerHTML = cards.map(c => `
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="text-3xl mb-2">${c.icon}</div>
+      <div class="text-3xl font-bold ${c.color}">${c.value}</div>
+      <div class="text-sm text-gray-500 mt-1">${c.label}</div>
+    </div>
+  `).join('');
+
+  // Role distribution bar chart
+  const roles = stats.role_distribution || {};
+  const total = Object.values(roles).reduce((a, b) => a + b, 0) || 1;
+  const roleColors = { admin: 'bg-violet-400', arzt: 'bg-blue-400', mfa: 'bg-sky-400', readonly: 'bg-gray-300' };
+
+  document.getElementById('role-chart').innerHTML = Object.entries(roles).length
+    ? Object.entries(roles).map(([role, count]) => `
+        <div class="flex items-center gap-3">
+          <div class="w-28 text-sm text-gray-600">${roleLabel(role)}</div>
+          <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div class="h-3 rounded-full ${roleColors[role] || 'bg-gray-400'} transition-all"
+              style="width:${Math.round(count / total * 100)}%"></div>
+          </div>
+          <div class="w-12 text-right text-sm font-medium text-gray-700">${count}</div>
+        </div>
+      `).join('')
+    : `<p class="text-sm text-gray-400">${t('admin.no_data')}</p>`;
+
+  await loadQualityMetrics();
+}
+
+function pct(rate) {
+  return rate === null || rate === undefined ? '–' : Math.round(rate * 100) + '%';
+}
+
+async function loadQualityMetrics() {
+  const resp = await apiCall('GET', '/admin/metrics/quality');
+  const m = resp && resp.ok ? await resp.json() : null;
+  if (!m) {
+    document.getElementById('quality-cards').innerHTML = `<p class="text-sm text-gray-400 col-span-3">${t('admin.no_data')}</p>`;
+    return;
+  }
+
+  const mcp = m.mcp_conflicts;
+  const conf = m.confidence_calibration;
+  const confGapOk = conf.avg_confidence_accepted != null && conf.avg_confidence_rejected != null
+    && conf.avg_confidence_accepted > conf.avg_confidence_rejected;
+
+  document.getElementById('quality-cards').innerHTML = `
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="text-sm text-gray-500 mb-1" data-i18n="admin.quality_acceptance_rate">Annahmequote gesamt</div>
+      <div class="text-3xl font-bold text-sky-600">${pct(m.overall.acceptance_rate)}</div>
+      <div class="text-xs text-gray-400 mt-1">${m.overall.accepted} / ${m.overall.accepted + m.overall.rejected} ${t('admin.quality_reviewed')} · ${m.overall.pending} ${t('admin.quality_pending')}</div>
+    </div>
+    <div class="bg-white border ${mcp.accepted_despite_flag > 0 ? 'border-amber-300 bg-amber-50' : 'border-gray-200'} rounded-xl p-5">
+      <div class="text-sm text-gray-500 mb-1" data-i18n="admin.quality_mcp_override">Trotz MCP-Konflikt akzeptiert</div>
+      <div class="text-3xl font-bold ${mcp.accepted_despite_flag > 0 ? 'text-amber-600' : 'text-gray-400'}">${mcp.accepted_despite_flag}</div>
+      <div class="text-xs text-gray-400 mt-1">${t('admin.quality_mcp_hint')} (${mcp.total_flagged} ${t('admin.quality_flagged_total')})</div>
+    </div>
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="text-sm text-gray-500 mb-1" data-i18n="admin.quality_confidence_calibration">Confidence-Kalibrierung</div>
+      <div class="text-3xl font-bold ${confGapOk ? 'text-emerald-600' : 'text-gray-400'}">${pct(conf.avg_confidence_accepted)} <span class="text-base text-gray-400">vs</span> ${pct(conf.avg_confidence_rejected)}</div>
+      <div class="text-xs text-gray-400 mt-1">${t('admin.quality_confidence_hint')}</div>
+    </div>
+  `;
+
+  document.getElementById('quality-quarter-chart').innerHTML = m.by_quarter.length
+    ? m.by_quarter.map(q => `
+        <div class="flex items-center gap-3">
+          <div class="w-16 text-xs font-mono text-gray-600">${q.quartal}</div>
+          <div class="flex-1 bg-gray-100 rounded-full h-3 overflow-hidden">
+            <div class="h-3 rounded-full bg-sky-400 transition-all" style="width:${q.acceptance_rate != null ? Math.round(q.acceptance_rate * 100) : 0}%"></div>
+          </div>
+          <div class="w-12 text-right text-sm font-medium text-gray-700">${pct(q.acceptance_rate)}</div>
+        </div>
+      `).join('')
+    : `<p class="text-sm text-gray-400">${t('admin.no_data')}</p>`;
+
+  document.getElementById('quality-gop-table').innerHTML = m.top_gops.length
+    ? `<table class="w-full text-sm">
+        <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+          <th class="px-3 py-2 font-medium">GOP</th>
+          <th class="px-3 py-2 font-medium text-right">${t('admin.quality_th_total')}</th>
+          <th class="px-3 py-2 font-medium text-right">${t('admin.quality_acceptance_rate')}</th>
+        </tr></thead>
+        <tbody>
+          ${m.top_gops.map(g => `
+            <tr class="border-b border-gray-50">
+              <td class="px-3 py-2 font-mono text-xs text-gray-700">${g.gop_code}</td>
+              <td class="px-3 py-2 text-right text-gray-600">${g.total}</td>
+              <td class="px-3 py-2 text-right font-medium ${g.acceptance_rate != null && g.acceptance_rate < 0.5 ? 'text-amber-600' : 'text-gray-700'}">${pct(g.acceptance_rate)}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>`
+    : `<p class="text-sm text-gray-400">${t('admin.no_data')}</p>`;
+}
+
+// ─── Init ────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await I18N.ready;
+  loadUsers();
+  // Guard: this page is admin-only
+  const me = JSON.parse(localStorage.getItem('ebm_user') || '{}');
+  if (me.role && me.role !== 'admin') {
+    document.querySelector('main').innerHTML = `
+      <div class="flex items-center justify-center h-full">
+        <div class="text-center p-8">
+          <div class="text-4xl mb-4">🔒</div>
+          <h2 class="text-xl font-semibold text-gray-800 mb-2">${t('admin.denied_heading')}</h2>
+          <p class="text-gray-500">${t('admin.denied_text')}</p>
+        </div>
+      </div>`;
+  }
+});
+
+// ════════════════════════════════════════════════════════════════════
+// IMPORT
+// ════════════════════════════════════════════════════════════════════
+let _importPollTimer = null;
+
+async function loadImport() {
+  const resp = await apiCall('GET', '/admin/import/status');
+  if (!resp || !resp.ok) return;
+  const data = await resp.json();
+  renderCatalogInfo(data.catalog_file);
+  renderDbStats(data.database);
+  renderImportRunStatus(data.last_run);
+
+  const srcResp = await apiCall('GET', '/admin/import/kbv-source');
+  if (srcResp && srcResp.ok) {
+    const src = await srcResp.json();
+    const input = document.getElementById('kbv-source-url');
+    if (input && document.activeElement !== input) input.value = src.url;
+  }
+}
+
+async function saveKbvSource() {
+  const url = document.getElementById('kbv-source-url').value.trim();
+  if (!url) return;
+  const resp = await apiCall('PUT', '/admin/import/kbv-source', { url });
+  if (!resp) return;
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.detail || t('common.error'));
+    return;
+  }
+}
+
+async function fetchKbvImport() {
+  const btn = document.getElementById('kbv-fetch-btn');
+  btn.disabled = true;
+  const resp = await apiCall('POST', '/admin/import/kbv-fetch');
+  if (!resp) { btn.disabled = false; return; }
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.detail || t('admin.import_start_failed'));
+    btn.disabled = false;
+    return;
+  }
+  await loadImport();
+}
+
+async function commitKbvImport() {
+  if (!_kbvPreviewRunId) return;
+  const btn = document.getElementById('kbv-commit-btn');
+  btn.disabled = true;
+  const resp = await apiCall('POST', `/admin/import/kbv-commit/${_kbvPreviewRunId}`);
+  if (!resp) { btn.disabled = false; return; }
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.detail || t('admin.import_start_failed'));
+    btn.disabled = false;
+    return;
+  }
+  document.getElementById('kbv-preview-panel').classList.add('hidden');
+  await loadImport();
+}
+
+function dismissKbvPreview() {
+  document.getElementById('kbv-preview-panel').classList.add('hidden');
+  document.getElementById('kbv-fetch-btn').disabled = false;
+  _kbvPreviewRunId = null;
+}
+
+let _kbvPreviewRunId = null;
+
+function renderCatalogInfo(info) {
+  const el = document.getElementById('import-catalog-info');
+  if (!info) {
+    el.innerHTML = `<p class="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg p-3">${t('admin.no_catalog')} <code class="font-mono">/data/ebm_catalog.json</code></p>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      ${kpiCard(t('admin.kpi_gops_file'), info.gop_count.toLocaleString(I18N.locale), 'text-sky-600')}
+      ${kpiCard(t('admin.kpi_file_size'), info.file_size_mb + ' MB', 'text-gray-600')}
+      ${kpiCard(t('admin.kpi_modified'), info.modified_at, 'text-gray-600')}
+      ${kpiCard(t('admin.kpi_source'), info.source || '—', 'text-gray-600')}
+    </div>
+    ${info.valid_from ? `<p class="mt-3 text-xs text-gray-400">${t('admin.valid_from')}: ${info.valid_from} · ${t('admin.path')}: <code class="font-mono">${info.path}</code></p>` : ''}`;
+}
+
+function renderDbStats(stats) {
+  const el = document.getElementById('import-db-stats');
+  if (!stats) { el.innerHTML = `<p class="col-span-3 text-sm text-gray-400">${t('admin.not_available')}</p>`; return; }
+  el.innerHTML = `
+    ${kpiCard(t('admin.kpi_gops_chroma'), (stats.chroma_gop_count || 0).toLocaleString(I18N.locale), 'text-emerald-600')}
+    ${kpiCard(t('admin.kpi_gops_neo4j'), (stats.neo4j_gop_count || 0).toLocaleString(I18N.locale), 'text-violet-600')}
+    ${kpiCard(t('admin.kpi_chapters_neo4j'), (stats.neo4j_chapter_count || 0).toLocaleString(I18N.locale), 'text-blue-600')}`;
+}
+
+function renderImportRunStatus(run) {
+  const el     = document.getElementById('import-run-status');
+  const prog   = document.getElementById('import-progress');
+  const btn    = document.getElementById('import-trigger-btn');
+  const msg    = document.getElementById('import-progress-msg');
+  const kvEl   = document.getElementById('kbv-import-status');
+  const kvProg = document.getElementById('kbv-import-progress');
+  const kvMsg  = document.getElementById('kbv-import-progress-msg');
+  const kvBtn  = document.getElementById('kbv-fetch-btn');
+  const kvPanel = document.getElementById('kbv-preview-panel');
+
+  const resetAll = () => {
+    el.classList.add('hidden'); prog.classList.add('hidden'); btn.disabled = false;
+    kvEl.classList.add('hidden'); kvProg.classList.add('hidden'); kvBtn.disabled = false;
+  };
+
+  if (!run || run.state === 'idle') { resetAll(); return; }
+
+  if (run.state === 'running') {
+    el.classList.add('hidden'); prog.classList.remove('hidden');
+    msg.textContent = run.message || t('admin.import_running');
+    btn.disabled = true; kvBtn.disabled = true;
+    if (!_importPollTimer) _importPollTimer = setInterval(() => loadImport(), 4000);
+    return;
+  }
+
+  if (run.state === 'fetching' || run.state === 'committing') {
+    kvEl.classList.add('hidden'); kvProg.classList.remove('hidden'); kvPanel.classList.add('hidden');
+    kvMsg.textContent = run.message || t('admin.import_running');
+    btn.disabled = true; kvBtn.disabled = true;
+    if (!_importPollTimer) _importPollTimer = setInterval(() => loadImport(), 3000);
+    return;
+  }
+
+  if (run.state === 'preview_ready' && run.preview) {
+    clearInterval(_importPollTimer); _importPollTimer = null;
+    kvProg.classList.add('hidden'); kvEl.classList.add('hidden');
+    btn.disabled = true; kvBtn.disabled = true;
+    _kbvPreviewRunId = run.preview.run_id;
+    renderKbvPreview(run.preview);
+    return;
+  }
+
+  // done / error
+  clearInterval(_importPollTimer);
+  _importPollTimer = null;
+  prog.classList.add('hidden'); kvProg.classList.add('hidden'); kvPanel.classList.add('hidden');
+  btn.disabled = false; kvBtn.disabled = false;
+  const isOk = run.state === 'done';
+  const cls = `mb-4 p-3 rounded-lg text-sm border ${isOk ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-red-50 border-red-200 text-red-800'}`;
+  el.className = cls; el.textContent = run.message; el.classList.remove('hidden');
+  kvEl.className = cls; kvEl.textContent = run.message; kvEl.classList.remove('hidden');
+}
+
+function renderKbvPreview(preview) {
+  const panel = document.getElementById('kbv-preview-panel');
+  const s = preview.stats;
+  document.getElementById('kbv-preview-stats').innerHTML = `
+    ${kpiCard(t('admin.kpi_total_gops'), s.total_gops.toLocaleString(I18N.locale), 'text-violet-700')}
+    ${kpiCard(t('admin.kpi_with_exclusions'), s.with_exclusions.toLocaleString(I18N.locale), 'text-sky-700')}
+    ${kpiCard(t('admin.kpi_missing_points'), s.missing_points_value.toLocaleString(I18N.locale), 'text-amber-700')}
+    ${kpiCard(t('admin.kpi_needs_review'), s.needs_review.toLocaleString(I18N.locale), 'text-red-700')}`;
+
+  const docWarnings = preview.document_warnings || [];
+  document.getElementById('kbv-preview-warnings').innerHTML = docWarnings.length
+    ? `⚠ ${docWarnings.join(' · ')}`
+    : t('admin.kbv_preview_hint');
+
+  document.getElementById('kbv-preview-sample').innerHTML =
+    `<div class="text-gray-500 mb-1">${t('admin.kbv_preview_sample_label')}</div>` +
+    preview.sample.map(g => `${g.code} — ${(g.description || '').slice(0, 70)} (${g.value_points} Pkt.)${g.warnings.length ? ' ⚠ ' + g.warnings.join(',') : ''}`).join('<br>');
+
+  panel.classList.remove('hidden');
+}
+
+function kpiCard(label, value, valueClass) {
+  return `<div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+    <p class="text-xs text-gray-500 mb-1">${label}</p>
+    <p class="text-xl font-bold ${valueClass}">${value}</p>
+  </div>`;
+}
+
+async function triggerImport() {
+  const btn = document.getElementById('import-trigger-btn');
+  btn.disabled = true;
+  const resp = await apiCall('POST', '/admin/import/trigger');
+  if (!resp) { btn.disabled = false; return; }
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    alert(err.detail || t('admin.import_start_failed'));
+    btn.disabled = false;
+    return;
+  }
+  await loadImport();
+}
+
+// ════════════════════════════════════════════════════════════════════
+// INTEROP
+// ════════════════════════════════════════════════════════════════════
+
+async function loadInterop() {
+  const grid = document.getElementById('interop-status-grid');
+  const resp = await apiCall('GET', '/interop/status');
+  if (!resp || !resp.ok) {
+    grid.innerHTML = `<div class="text-sm text-red-500 col-span-2">${t('admin.interop_load_failed')}</div>`;
+    return;
+  }
+  const s = await resp.json();
+
+  const card = (title, icon, lines) => `
+    <div class="bg-white border border-gray-200 rounded-xl p-5">
+      <div class="flex items-center gap-2 mb-3">
+        <span>${icon}</span>
+        <h3 class="font-semibold text-gray-700">${title}</h3>
+        <span class="ml-auto px-2 py-0.5 text-xs rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">${t('common.active')}</span>
+      </div>
+      <dl class="space-y-1.5">
+        ${lines.map(([k,v]) => `
+          <div class="flex gap-2 text-xs">
+            <dt class="text-gray-400 w-28 flex-shrink-0">${k}</dt>
+            <dd class="text-gray-700 font-mono break-all">${v}</dd>
+          </div>`).join('')}
+      </dl>
+    </div>`;
+
+  grid.innerHTML =
+    card('GDT/BDT Bridge', '⚕', [
+      ['Standard', 'GDT 2.1 (KBV)'],
+      ['Encoding', 'ISO 8859-1'],
+      ['Upload', s.gdt?.upload_endpoint || '–'],
+      ['Export', s.gdt?.export_endpoint || '–'],
+    ]) +
+    card('HL7 FHIR R4', '🏥', [
+      ['Version', s.fhir?.version || 'R4'],
+      ['Operation', '$analyze-ebm'],
+      [t('admin.llm_endpoint'), s.fhir?.endpoint || '–'],
+      [t('admin.resources'), (s.fhir?.supported_resources || []).join(', ')],
+    ]) +
+    card('MCP External Tool', '🤖', [
+      ['Tool', s.mcp_external_tool?.tool_name || '–'],
+      ['Transport', s.mcp_external_tool?.transport || 'SSE'],
+      ['URL', 'http://mcp-server:8001/sse'],
+      ['Auth', 'X-MCP-Secret'],
+    ]) +
+    card(t('admin.internal_channel'), '🔒', [
+      [t('admin.llm_endpoint'), '/api/interop/internal/analyze'],
+      ['Auth', 'X-Internal-Key'],
+      [t('admin.consumer'), 'MCP → FastAPI'],
+      ['Isolation', t('admin.container_internal')],
+    ]);
+}
+
+async function uploadGDT() {
+  const fileInput = document.getElementById('gdt-file-input');
+  const resultDiv = document.getElementById('gdt-result');
+  const btn = document.getElementById('gdt-upload-btn');
+
+  if (!fileInput.files.length) { alert(t('admin.select_gdt_file')); return; }
+
+  btn.disabled = true;
+  btn.textContent = t('analysis.analyzing');
+  resultDiv.classList.add('hidden');
+
+  const fd = new FormData();
+  fd.append('file', fileInput.files[0]);
+
+  try {
+    // Session identity travels via the httpOnly cookie (see base.html apiCall).
+    const resp = await fetch('/api/interop/gdt/analyze', {
+      method: 'POST',
+      credentials: 'same-origin',
+      body: fd,
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      resultDiv.innerHTML = `<div class="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">${data.detail || t('common.error')}</div>`;
+      resultDiv.classList.remove('hidden');
+      return;
+    }
+
+    const gopRows = (data.gop_results || []).map(g =>
+      `<tr class="border-b border-gray-50">
+        <td class="px-3 py-2 font-mono font-bold text-sky-700">${g.gop_code}</td>
+        <td class="px-3 py-2 text-xs text-gray-600">${(g.description || '').substring(0,80)}</td>
+        <td class="px-3 py-2 text-xs text-right">${Math.round((g.confidence||0)*100)}%</td>
+      </tr>`
+    ).join('');
+
+    resultDiv.innerHTML = `
+      <div class="space-y-3">
+        <div class="flex gap-4 text-sm">
+          <div class="flex items-center gap-1.5 text-emerald-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <span><strong>${data.gop_count}</strong> ${t('analysis.gops_validated')}</span>
+          </div>
+          <div class="text-gray-400">${data.patient?.last_name || ''} ${data.patient?.first_name || ''} · ${data.patient?.insurance_type || ''} · ${data.treatment_date || ''}</div>
+        </div>
+        ${gopRows ? `<table class="w-full text-sm"><thead><tr class="text-xs text-gray-400"><th class="px-3 py-1.5 text-left">GOP</th><th class="px-3 py-1.5 text-left">${t('admin.th_description')}</th><th class="px-3 py-1.5 text-right">${t('common.confidence')}</th></tr></thead><tbody>${gopRows}</tbody></table>` : `<div class="text-sm text-gray-400">${t('admin.no_gops_found')}</div>`}
+        ${data.gdt_download_url ? `
+          <a href="${data.gdt_download_url}"
+            class="inline-flex items-center gap-2 px-4 py-2 bg-sky-600 text-white text-sm font-medium rounded-lg hover:bg-sky-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            ${t('admin.download_gdt')}
+          </a>` : ''}
+      </div>`;
+    resultDiv.classList.remove('hidden');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = t('admin.analyze_button');
+  }
+}
+
+// ════════════════════════════════════════════════════════════════════
+// API KEYS
+// ════════════════════════════════════════════════════════════════════
+
+const SCOPE_LABELS = { interop: 'Interop', analysis: 'Analysis', patients: 'Patients', cases: 'Cases' };
+
+async function loadApiKeys() {
+  const container = document.getElementById('apikeys-table');
+  const resp = await apiCall('GET', '/admin/api-keys');
+  if (!resp || !resp.ok) {
+    container.innerHTML = `<div class="text-center py-10 text-red-400 text-sm">${t('admin.load_failed')}</div>`;
+    return;
+  }
+  const keys = await resp.json();
+
+  if (!keys.length) {
+    container.innerHTML = `<div class="text-center py-12 text-gray-400 text-sm">${t('admin.no_apikeys')}</div>`;
+    return;
+  }
+
+  const scopeBadges = scopes => (scopes || []).map(s =>
+    `<span class="px-1.5 py-0.5 text-xs rounded bg-sky-50 border border-sky-200 text-sky-700 mr-1">${SCOPE_LABELS[s] || s}</span>`
+  ).join('');
+
+  container.innerHTML = `
+    <div class="overflow-x-auto">
+    <table class="w-full text-sm">
+      <thead><tr class="text-left text-xs text-gray-500 border-b border-gray-100">
+        <th class="px-5 py-3 font-medium">${t('common.name')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_key_prefix')}</th>
+        <th class="px-4 py-3 font-medium">Scopes</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_created')}</th>
+        <th class="px-4 py-3 font-medium">${t('admin.th_last_used')}</th>
+        <th class="px-4 py-3 font-medium">${t('common.status')}</th>
+        <th class="px-4 py-3 font-medium"></th>
+      </tr></thead>
+      <tbody>
+        ${keys.map(k => `
+          <tr class="border-b border-gray-50 hover:bg-gray-50">
+            <td class="px-5 py-3 font-medium text-gray-800">${k.name}</td>
+            <td class="px-4 py-3 font-mono text-xs text-gray-500">${k.key_prefix}…</td>
+            <td class="px-4 py-3">${scopeBadges(k.scopes)}</td>
+            <td class="px-4 py-3 text-xs text-gray-500">${k.created_at}</td>
+            <td class="px-4 py-3 text-xs text-gray-500">${k.last_used_at || t('common.never')}</td>
+            <td class="px-4 py-3">
+              ${k.is_active
+                ? `<span class="px-2 py-0.5 text-xs rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700">${t('common.active')}</span>`
+                : `<span class="px-2 py-0.5 text-xs rounded-full bg-gray-50 border border-gray-200 text-gray-500">${t('admin.revoked')}</span>`}
+            </td>
+            <td class="px-4 py-3">
+              ${k.is_active ? `<button onclick="revokeApiKey('${k.id}')" class="text-xs text-red-500 hover:text-red-700 font-medium">${t('admin.revoke')}</button>` : ''}
+            </td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+    </div>
+  `;
+}
+
+function openCreateKeyModal() {
+  document.getElementById('create-key-form').reset();
+  document.getElementById('create-key-error').classList.add('hidden');
+  document.getElementById('modal-create-key').classList.remove('hidden');
+}
+
+async function submitCreateKey(event) {
+  event.preventDefault();
+  const form = event.target;
+  const errorDiv = document.getElementById('create-key-error');
+  errorDiv.classList.add('hidden');
+
+  const scopes = Array.from(form.querySelectorAll('input[name="scope"]:checked')).map(el => el.value);
+  const expiresRaw = form.expires_in_days.value;
+
+  const body = {
+    name: form.name.value.trim(),
+    scopes,
+    expires_in_days: expiresRaw ? parseInt(expiresRaw, 10) : null,
+  };
+
+  const resp = await apiCall('POST', '/admin/api-keys', body);
+  if (!resp) return;
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    errorDiv.textContent = err.detail || t('admin.key_create_failed');
+    errorDiv.classList.remove('hidden');
+    return;
+  }
+  const data = await resp.json();
+  closeModal('modal-create-key');
+
+  // Show the plaintext key exactly once
+  document.getElementById('show-key-value').value = data.api_key;
+  document.getElementById('modal-show-key').classList.remove('hidden');
+}
+
+function copyKeyValue() {
+  const input = document.getElementById('show-key-value');
+  input.select();
+  navigator.clipboard?.writeText(input.value);
+}
+
+async function revokeApiKey(keyId) {
+  if (!confirm(t('admin.confirm_revoke'))) return;
+  const resp = await apiCall('DELETE', `/admin/api-keys/${keyId}`);
+  if (resp && resp.ok) await loadApiKeys();
+}
+</script>
+{% endblock %}
