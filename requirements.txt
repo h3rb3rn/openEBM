@@ -1,0 +1,5 @@
+# Pinned dependencies for building the MkDocs documentation site.
+# Keep in sync with the version used in .github/workflows/docs.yml.
+mkdocs-material==9.5.44
+mkdocs==1.6.1
+pymdown-extensions==10.11.2
